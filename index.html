@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>智能销售单生成器 - 无图片缓存版</title>
+    <title>智能销售单生成器 - 干净导出版</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -533,7 +533,6 @@
                 signer: document.getElementById('editSigner').value,
                 customer: document.getElementById('editCustomer').value,
                 remark: document.getElementById('remarkText').innerText
-                // 注意：不保存任何图片相关数据（brandLeft, stampSrc 等）
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         } catch(e) {
@@ -562,15 +561,6 @@
             console.warn('读取缓存失败', e);
             return false;
         }
-    }
-    
-    // 包装需要触发保存的关键操作
-    function withSave(fn) {
-        return function(...args) {
-            const result = fn.apply(this, args);
-            saveToLocalStorage();
-            return result;
-        };
     }
     
     // ---------- 图片拖拽（不保存位置到缓存）----------
@@ -722,7 +712,6 @@
     
     makeDraggable(brandImage, getBrandPos, setBrandPos);
     makeDraggable(companyStamp, getStampPos, setStampPos);
-    // 初始默认位置
     setBrandPos(20, 0);
     setBrandSize();
     companyStamp.style.transform = 'translate(-50%, -50%)';
@@ -770,11 +759,91 @@
     function parseBatch(){ const raw=document.getElementById('batchRawInput').value; const lines=raw.split(/\r?\n/); let results=[]; for(let line of lines){ line=line.trim(); if(!line) continue; let parsed=parseProductLine(line); if(parsed) results.push(parsed); } parsedBuffer=results; const previewDiv=document.getElementById('parsePreview'); if(results.length===0) previewDiv.innerHTML='<div style="color:#e67e22;">⚠️ 未能识别有效商品</div>'; else previewDiv.innerHTML=results.map(p=>`<div class="preview-item">✅ ${p.name} &nbsp; ${p.qty}${p.unit} &nbsp; ¥${p.price.toFixed(2)} (小计: ${(p.qty*p.price).toFixed(2)})</div>`).join(''); return results; }
     function confirmAddBatch(){ if(parsedBuffer.length===0){ alert('没有解析成功的商品，请先点击“智能解析预览”'); return; } for(let prod of parsedBuffer) items.push({...prod, remark:''}); if(items.length>0 && selectedIndex===-1) selectedIndex=0; renderTable(); parsedBuffer=[]; document.getElementById('parsePreview').innerHTML='<div style="color:#2e7d64;">✅ 已成功添加</div>'; document.getElementById('batchRawInput').value=''; }
     
-    // 导出图片/PDF/打印
-    function getCleanClone(){ const original=document.getElementById('invoiceContainer'); const clone=original.cloneNode(true); const btn=clone.querySelector('#editRemarkBtn'); if(btn) btn.remove(); return clone; }
-    async function saveImage(){ const btn=document.getElementById('saveAsImageBtn'), orig=btn.innerText; btn.innerText='生成中...'; btn.disabled=true; try{ const clone=getCleanClone(); clone.style.position='absolute'; clone.style.top='-9999px'; clone.style.left='-9999px'; clone.style.width=document.getElementById('invoiceContainer').offsetWidth+'px'; document.body.appendChild(clone); const canvas=await html2canvas(clone,{scale:3,backgroundColor:'#fff',logging:false}); document.body.removeChild(clone); const link=document.createElement('a'); link.download=`销售单_${document.getElementById('invoiceNo').innerText}.png`; link.href=canvas.toDataURL(); link.click(); }catch(e){ alert('生成图片失败'); }finally{ btn.innerText=orig; btn.disabled=false; } }
-    async function downloadPDF(){ const btn=document.getElementById('downloadPdfBtn'), orig=btn.innerText; btn.innerText='生成PDF...'; btn.disabled=true; try{ const clone=getCleanClone(); clone.style.position='absolute'; clone.style.top='-9999px'; clone.style.width=document.getElementById('invoiceContainer').offsetWidth+'px'; document.body.appendChild(clone); const canvas=await html2canvas(clone,{scale:3,backgroundColor:'#fff',logging:false}); document.body.removeChild(clone); const imgData=canvas.toDataURL('image/png'), {jsPDF}=window.jspdf; const imgW=canvas.width, imgH=canvas.height, pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight(), ratio=pdfW/imgW, imgHmm=imgH*ratio; if(imgHmm<=pdfH) pdf.addImage(imgData,'PNG',0,0,pdfW,imgHmm); else{ let remain=imgHmm, curY=0; while(remain>0){ let sliceH=Math.min(pdfH,remain), sliceCanvas=document.createElement('canvas'), sliceW=imgW, sliceHpx=sliceH/ratio; sliceCanvas.width=sliceW; sliceCanvas.height=sliceHpx; sliceCanvas.getContext('2d').drawImage(canvas,0,curY,sliceW,sliceHpx,0,0,sliceW,sliceHpx); pdf.addImage(sliceCanvas.toDataURL(),'PNG',0,0,pdfW,sliceH); remain-=sliceH; curY+=sliceHpx; if(remain>0) pdf.addPage(); } } pdf.save(`销售单_${document.getElementById('invoiceNo').innerText}.pdf`); }catch(e){ alert('PDF生成失败'); }finally{ btn.innerText=orig; btn.disabled=false; } }
-    async function printInvoice(){ const btn=document.getElementById('printBtn'), orig=btn.innerText; btn.innerText='准备打印...'; btn.disabled=true; try{ const clone=getCleanClone(); const win=window.open('','_blank'); if(!win){ alert('请允许弹窗'); return; } clone.style.width='100%'; clone.style.margin='0 auto'; const styles=Array.from(document.styleSheets).reduce((acc,s)=>{ try{ const rules=s.cssRules||s.rules; if(rules) for(let r of rules) acc+=r.cssText; }catch(e){} return acc; },''); win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel, .btn-group, .remark-box button { display:none; }</style></head><body><div style="max-width:1280px;margin:0 auto;">${clone.outerHTML}</div></body></html>`); win.document.close(); win.onload=()=>win.print(); }catch(e){ alert('打印失败'); }finally{ btn.innerText=orig; btn.disabled=false; } }
+    // 导出图片/PDF/打印 - 清除所有选中高亮后导出
+    function getCleanClone() {
+        const original = document.getElementById('invoiceContainer');
+        const clone = original.cloneNode(true);
+        // 移除编辑备注按钮（避免导出按钮）
+        const editBtn = clone.querySelector('#editRemarkBtn');
+        if (editBtn) editBtn.remove();
+        // 清除所有选中的行高亮（selected-row 类）
+        const selectedRows = clone.querySelectorAll('.selected-row');
+        selectedRows.forEach(row => {
+            row.classList.remove('selected-row');
+        });
+        // 同时清除可能存在的拖拽类样式（不影响显示但为了干净）
+        const draggingElements = clone.querySelectorAll('.dragging');
+        draggingElements.forEach(el => el.classList.remove('dragging'));
+        return clone;
+    }
+    
+    async function saveImage(){ 
+        const btn=document.getElementById('saveAsImageBtn'), orig=btn.innerText; 
+        btn.innerText='生成中...'; btn.disabled=true; 
+        try{ 
+            const clone=getCleanClone(); 
+            clone.style.position='absolute'; 
+            clone.style.top='-9999px'; 
+            clone.style.left='-9999px'; 
+            clone.style.width=document.getElementById('invoiceContainer').offsetWidth+'px'; 
+            document.body.appendChild(clone); 
+            const canvas=await html2canvas(clone,{scale:3,backgroundColor:'#fff',logging:false}); 
+            document.body.removeChild(clone); 
+            const link=document.createElement('a'); 
+            link.download=`销售单_${document.getElementById('invoiceNo').innerText}.png`; 
+            link.href=canvas.toDataURL(); 
+            link.click(); 
+        }catch(e){ alert('生成图片失败'); }finally{ btn.innerText=orig; btn.disabled=false; } 
+    }
+    
+    async function downloadPDF(){ 
+        const btn=document.getElementById('downloadPdfBtn'), orig=btn.innerText; 
+        btn.innerText='生成PDF...'; btn.disabled=true; 
+        try{ 
+            const clone=getCleanClone(); 
+            clone.style.position='absolute'; 
+            clone.style.top='-9999px'; 
+            clone.style.width=document.getElementById('invoiceContainer').offsetWidth+'px'; 
+            document.body.appendChild(clone); 
+            const canvas=await html2canvas(clone,{scale:3,backgroundColor:'#fff',logging:false}); 
+            document.body.removeChild(clone); 
+            const imgData=canvas.toDataURL('image/png'), {jsPDF}=window.jspdf; 
+            const imgW=canvas.width, imgH=canvas.height, pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); 
+            const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight(), ratio=pdfW/imgW, imgHmm=imgH*ratio; 
+            if(imgHmm<=pdfH) pdf.addImage(imgData,'PNG',0,0,pdfW,imgHmm); 
+            else{ 
+                let remain=imgHmm, curY=0; 
+                while(remain>0){ 
+                    let sliceH=Math.min(pdfH,remain), sliceCanvas=document.createElement('canvas'), sliceW=imgW, sliceHpx=sliceH/ratio; 
+                    sliceCanvas.width=sliceW; sliceCanvas.height=sliceHpx; 
+                    sliceCanvas.getContext('2d').drawImage(canvas,0,curY,sliceW,sliceHpx,0,0,sliceW,sliceHpx); 
+                    pdf.addImage(sliceCanvas.toDataURL(),'PNG',0,0,pdfW,sliceH); 
+                    remain-=sliceH; curY+=sliceHpx; 
+                    if(remain>0) pdf.addPage(); 
+                } 
+            } 
+            pdf.save(`销售单_${document.getElementById('invoiceNo').innerText}.pdf`); 
+        }catch(e){ alert('PDF生成失败'); }finally{ btn.innerText=orig; btn.disabled=false; } 
+    }
+    
+    async function printInvoice(){ 
+        const btn=document.getElementById('printBtn'), orig=btn.innerText; 
+        btn.innerText='准备打印...'; btn.disabled=true; 
+        try{ 
+            const clone=getCleanClone(); 
+            const win=window.open('','_blank'); 
+            if(!win){ alert('请允许弹窗'); return; } 
+            clone.style.width='100%'; 
+            clone.style.margin='0 auto'; 
+            const styles=Array.from(document.styleSheets).reduce((acc,s)=>{ 
+                try{ const rules=s.cssRules||s.rules; if(rules) for(let r of rules) acc+=r.cssText; }catch(e){} 
+                return acc; 
+            },''); 
+            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel, .btn-group, .remark-box button { display:none; }</style></head><body><div style="max-width:1280px;margin:0 auto;">${clone.outerHTML}</div></body></html>`); 
+            win.document.close(); 
+            win.onload=()=>win.print(); 
+        }catch(e){ alert('打印失败'); }finally{ btn.innerText=orig; btn.disabled=false; } 
+    }
     
     function initRemark(){ document.getElementById('editRemarkBtn').onclick=()=>{ let v=prompt("编辑备注",document.getElementById('remarkText').innerText); if(v!==null){ document.getElementById('remarkText').innerText=v.trim()||"—"; saveToLocalStorage(); } }; }
     function bindEvents(){ 
