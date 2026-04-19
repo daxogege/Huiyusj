@@ -576,17 +576,20 @@
         .remark-box button:hover {
             background: #fff1e6;
         }
-        /* 按钮组：强制横向居中，手机UA也居中 */
+        /* 按钮组：强制横向居中，手机端强制不换行且居中 */
         .btn-group {
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 15px;
             margin-top: 20px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;        /* 强制不换行 */
+            overflow-x: auto;         /* 窄屏时可滚动，保证一行显示 */
             width: 100%;
+            padding-bottom: 5px;
         }
         .btn-group button {
+            flex-shrink: 0;
             border: none;
             color: white;
             font-size: 14px;
@@ -606,7 +609,7 @@
         .footer-note-bottom {
             display: none;
         }
-        /* 手机端滚动适配：按钮居中且父容器居中 */
+        /* 手机端滚动适配 */
         @media (max-width: 220mm) {
             body {
                 padding: 10px;
@@ -614,9 +617,6 @@
             .invoice-container, .control-panel {
                 margin-left: auto;
                 margin-right: auto;
-            }
-            .btn-group {
-                justify-content: center;
             }
         }
     </style>
