@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>智能销售单生成器 - 智能缓存版</title>
+    <title>智能销售单生成器 - 无图片缓存版</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -488,6 +488,7 @@
                 </div>
             </div>
         </div>
+        <div class="footer-note" style="font-size: 11px; color: #888; margin-top: 8px;">💡 提示：刷新后图片会消失（因存储限制），但位置和大小会被保留，重新上传即可恢复位置。</div>
     </div>
 
     <div class="batch-parse">
@@ -519,7 +520,7 @@
     const STANDARD_UNITS = new Set(['个','台','套','根','件','只','条','支','箱','包','瓶','盒','桶','双','对','米','千克','公斤','克','升','毫升','袋','卷','组','部','块','片','张','把','粒','罐','打','份','册','本','辆','架','顶','副','串','捆','扎','排','座','栋','扇','盏','枚','轴','码','英尺','英寸','厘米','毫米','GB','TB','张/包','个/箱','米/卷','台/套','箱/件','台/个','支/盒','卷/包','套/箱','项','次']);
     const CHINESE_NUM_MAP = { '一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
     
-    // ---------- 本地缓存（智能处理图片：仅当图片已上传时才缓存图片数据）----------
+    // ---------- 本地缓存（不缓存图片 base64，只缓存元数据）----------
     const STORAGE_KEY = 'SmartSalesInvoiceData';
     function saveToLocalStorage() {
         try {
@@ -531,29 +532,21 @@
                 contact: document.getElementById('editContact').value,
                 signer: document.getElementById('editSigner').value,
                 customer: document.getElementById('editCustomer').value,
-                remark: document.getElementById('remarkText').innerText
+                remark: document.getElementById('remarkText').innerText,
+                // 品牌图：只保存位置和尺寸，不保存图片内容（避免空间不足）
+                brandLeft: brandImage.style.left,
+                brandTop: brandImage.style.top,
+                brandWidth: brandWidthInput.value,
+                // 公司章：只保存位置和尺寸
+                stampLeft: companyStamp.style.left,
+                stampTop: companyStamp.style.top,
+                stampWidth: stampWidthInput.value,
+                stampTransform: companyStamp.style.transform
             };
-            // 品牌图：仅当图片存在且不是空字符串时才保存
-            const brandSrc = brandImage.src;
-            if (brandSrc && brandSrc !== '' && brandImage.style.display !== 'none') {
-                data.brandSrc = brandSrc;
-                data.brandLeft = brandImage.style.left;
-                data.brandTop = brandImage.style.top;
-                data.brandWidth = brandWidthInput.value;
-            }
-            // 公司章：仅当图片存在且不是空字符串时才保存
-            const stampSrc = companyStamp.src;
-            if (stampSrc && stampSrc !== '' && companyStamp.style.display !== 'none') {
-                data.stampSrc = stampSrc;
-                data.stampLeft = companyStamp.style.left;
-                data.stampTop = companyStamp.style.top;
-                data.stampWidth = stampWidthInput.value;
-                data.stampTransform = companyStamp.style.transform;
-            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         } catch(e) {
             console.warn('保存缓存失败', e);
-            if(e.name === 'QuotaExceededError') alert('本地存储空间不足，图片可能过大，请尝试压缩图片后重新上传。');
+            // 不再弹出空间不足警告，因为不再保存图片数据，基本不会超限
         }
     }
     
@@ -571,31 +564,20 @@
             if (data.customer) document.getElementById('editCustomer').value = data.customer;
             if (data.remark) document.getElementById('remarkText').innerText = data.remark;
             
-            // 恢复品牌图（仅当缓存中明确存在且有效）
-            if (data.brandSrc && data.brandSrc !== '') {
-                brandImage.src = data.brandSrc;
-                brandImage.style.display = 'inline-block';
-                if (data.brandLeft) brandImage.style.left = data.brandLeft;
-                if (data.brandTop) brandImage.style.top = data.brandTop;
-                if (data.brandWidth) brandWidthInput.value = data.brandWidth;
-                setBrandSize();
-            } else {
-                brandImage.style.display = 'none';
-                brandImage.src = '';
-            }
-            // 恢复公司章
-            if (data.stampSrc && data.stampSrc !== '') {
-                companyStamp.src = data.stampSrc;
-                companyStamp.style.display = 'inline-block';
-                if (data.stampTransform) companyStamp.style.transform = data.stampTransform;
-                if (data.stampLeft) companyStamp.style.left = data.stampLeft;
-                if (data.stampTop) companyStamp.style.top = data.stampTop;
-                if (data.stampWidth) stampWidthInput.value = data.stampWidth;
-                setStampSize();
-            } else {
-                companyStamp.style.display = 'none';
-                companyStamp.src = '';
-            }
+            // 恢复品牌图的位置和尺寸（不恢复图片内容）
+            if (data.brandLeft) brandImage.style.left = data.brandLeft;
+            if (data.brandTop) brandImage.style.top = data.brandTop;
+            if (data.brandWidth) brandWidthInput.value = data.brandWidth;
+            setBrandSize(); // 应用宽度，但不显示图片（因为没有 src）
+            
+            // 恢复公司章的位置和尺寸
+            if (data.stampTransform) companyStamp.style.transform = data.stampTransform;
+            if (data.stampLeft) companyStamp.style.left = data.stampLeft;
+            if (data.stampTop) companyStamp.style.top = data.stampTop;
+            if (data.stampWidth) stampWidthInput.value = data.stampWidth;
+            setStampSize();
+            
+            // 注意：图片本身不会恢复，需要用户重新上传，但位置会保留
             syncEditableInfo();
             renderTable();
             return true;
@@ -684,6 +666,7 @@
     function setBrandPos(left, top) {
         brandImage.style.left = left + 'px';
         brandImage.style.top = top + 'px';
+        saveToLocalStorage();
     }
     
     function getStampPos() {
@@ -706,6 +689,7 @@
         companyStamp.style.transform = 'none';
         companyStamp.style.left = left + 'px';
         companyStamp.style.top = top + 'px';
+        saveToLocalStorage();
     }
     
     function setBrandSize() { 
@@ -729,7 +713,8 @@
             reader.onload=ev=>{ 
                 brandImage.src=ev.target.result; 
                 brandImage.style.display='inline-block'; 
-                setBrandPos(20, 0); 
+                // 如果没有保存过位置，设置默认
+                if (!brandImage.style.left || brandImage.style.left === '') setBrandPos(20, 0);
                 setBrandSize(); 
                 saveToLocalStorage(); 
             }; 
@@ -752,9 +737,12 @@
             reader.onload=ev=>{ 
                 companyStamp.src=ev.target.result; 
                 companyStamp.style.display='inline-block'; 
-                companyStamp.style.transform = 'translate(-50%, -50%)'; 
-                companyStamp.style.left = '50%'; 
-                companyStamp.style.top = '50%'; 
+                // 如果没有保存过位置，使用居中
+                if (!companyStamp.style.left || companyStamp.style.left === '50%' || companyStamp.style.transform === 'translate(-50%, -50%)') {
+                    companyStamp.style.transform = 'translate(-50%, -50%)'; 
+                    companyStamp.style.left = '50%'; 
+                    companyStamp.style.top = '50%';
+                }
                 setStampSize(); 
                 saveToLocalStorage(); 
             }; 
@@ -771,11 +759,14 @@
     
     makeDraggable(brandImage, getBrandPos, setBrandPos);
     makeDraggable(companyStamp, getStampPos, setStampPos);
-    setBrandPos(20, 0);
+    // 初始默认位置（如果没有缓存，会使用默认值）
+    if (!brandImage.style.left) setBrandPos(20, 0);
     setBrandSize();
-    companyStamp.style.transform = 'translate(-50%, -50%)';
-    companyStamp.style.left = '50%';
-    companyStamp.style.top = '50%';
+    if (!companyStamp.style.transform || companyStamp.style.transform === 'none') {
+        companyStamp.style.transform = 'translate(-50%, -50%)';
+        companyStamp.style.left = '50%';
+        companyStamp.style.top = '50%';
+    }
     setStampSize();
 
     // ---------- 销售单核心逻辑（带自动保存）----------
@@ -854,7 +845,9 @@
             syncEditableInfo();
             renderTable();
         }
-        // 确保图片显示状态与缓存一致（已经由loadFromLocalStorage处理）
+        // 如果缓存中有位置信息但图片没有显示，不自动恢复图片（需要用户重新上传）
+        if (brandImage.src && brandImage.src !== '') brandImage.style.display = 'inline-block';
+        if (companyStamp.src && companyStamp.src !== '') companyStamp.style.display = 'inline-block';
     }
     init();
 </script>
