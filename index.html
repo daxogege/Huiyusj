@@ -16,7 +16,7 @@
             background: #eef2f5;
             font-family: 'Segoe UI', '微软雅黑', Roboto, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 20px 20px 80px 20px;  /* 底部留出空间，避免悬浮按钮遮挡内容 */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -38,7 +38,11 @@
         @media print {
             body { background: white; padding: 0; margin: 0; }
             .invoice-container { box-shadow: none; padding: 0; margin: 0; border-radius: 0 !important; width: 100%; min-width: auto; }
-            .btn-group, .control-panel, .remark-box button { display: none !important; }
+            .control-panel, .remark-box button { display: none !important; }
+            /* 打印时隐藏浮动按钮组 */
+            .floating-btn-group {
+                display: none !important;
+            }
             .brand-overlay, .company-stamp { opacity: 0.9 !important; }
         }
         /* 品牌图（绝对定位，可在整个容器内移动） */
@@ -576,19 +580,30 @@
         .remark-box button:hover {
             background: #fff1e6;
         }
-        /* 按钮组：强制横向居中，手机端强制不换行且居中 */
-        .btn-group {
+        /* 浮动按钮组：固定定位，始终在最上层，居中显示 */
+        .floating-btn-group {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 15px;
-            margin-top: 20px;
-            flex-wrap: nowrap;        /* 强制不换行 */
-            overflow-x: auto;         /* 窄屏时可滚动，保证一行显示 */
-            width: 100%;
-            padding-bottom: 5px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 60px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+            width: fit-content;
+            margin: 0 auto;
+            max-width: 90%;
+            pointer-events: auto;
         }
-        .btn-group button {
+        .floating-btn-group button {
             flex-shrink: 0;
             border: none;
             color: white;
@@ -599,6 +614,7 @@
             font-weight: bold;
             transition: 0.2s;
             white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         #saveAsImageBtn { background: #2c7da0; }
         #saveAsImageBtn:hover { background: #1f5e7a; }
@@ -606,17 +622,27 @@
         #downloadPdfBtn:hover { background: #c9302c; }
         #printBtn { background: #5f6c7a; }
         #printBtn:hover { background: #4a5568; }
+        
         .footer-note-bottom {
             display: none;
         }
-        /* 手机端滚动适配 */
+        /* 手机端适配：按钮组依然居中，保持浮动 */
         @media (max-width: 220mm) {
             body {
-                padding: 10px;
+                padding: 10px 10px 80px 10px;
             }
             .invoice-container, .control-panel {
                 margin-left: auto;
                 margin-right: auto;
+            }
+            .floating-btn-group {
+                bottom: 10px;
+                gap: 10px;
+                padding: 8px 12px;
+            }
+            .floating-btn-group button {
+                padding: 6px 16px;
+                font-size: 13px;
             }
         }
     </style>
@@ -757,7 +783,9 @@
         </div>
     </div>
 </div>
-<div class="btn-group">
+
+<!-- 浮动按钮组，始终在最上层居中显示 -->
+<div class="floating-btn-group">
     <button id="saveAsImageBtn">📷 保存为图片</button>
     <button id="downloadPdfBtn">📄 下载 PDF</button>
     <button id="printBtn">🖨️ 打印销售单</button>
@@ -1004,7 +1032,7 @@
     function parseBatch(){ const raw=document.getElementById('batchRawInput').value; const lines=raw.split(/\r?\n/); let results=[]; for(let line of lines){ line=line.trim(); if(!line) continue; let parsed=parseProductLine(line); if(parsed) results.push(parsed); } parsedBuffer=results; const previewDiv=document.getElementById('parsePreview'); if(results.length===0) previewDiv.innerHTML='<div style="color:#e67e22;">⚠️ 未能识别有效商品</div>'; else previewDiv.innerHTML=results.map(p=>`<div class="preview-item">✅ ${p.name} &nbsp; ${p.qty}${p.unit} &nbsp; ¥${p.price.toFixed(2)} (小计: ${(p.qty*p.price).toFixed(2)})</div>`).join(''); return results; }
     function confirmAddBatch(){ if(parsedBuffer.length===0){ alert('没有解析成功的商品，请先点击“智能解析预览”'); return; } for(let prod of parsedBuffer) items.push({...prod, remark:''}); if(items.length>0 && selectedIndex===-1) selectedIndex=0; renderTable(); parsedBuffer=[]; document.getElementById('parsePreview').innerHTML='<div style="color:#2e7d64;">✅ 已成功添加</div>'; document.getElementById('batchRawInput').value=''; }
     
-    // 导出功能
+    // 导出功能 (保持原有逻辑)
     function getCleanClone(exportWidth = null) {
         const original = document.getElementById('invoiceContainer');
         const clone = original.cloneNode(true);
@@ -1111,7 +1139,7 @@
                 try{ const rules=s.cssRules||s.rules; if(rules) for(let r of rules) acc+=r.cssText; }catch(e){} 
                 return acc; 
             },''); 
-            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel, .btn-group, .remark-box button { display:none; } .invoice-container { border-radius: 0 !important; overflow: hidden !important; }</style></head><body><div style="max-width:210mm;margin:0 auto;">${clone.outerHTML}</div></body></html>`); 
+            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel, .floating-btn-group, .remark-box button { display:none; } .invoice-container { border-radius: 0 !important; overflow: hidden !important; }</style></head><body><div style="max-width:210mm;margin:0 auto;">${clone.outerHTML}</div></body></html>`); 
             win.document.close(); 
             win.onload=()=>win.print(); 
         }catch(e){ alert('打印失败'); }finally{ btn.innerText=orig; btn.disabled=false; } 
