@@ -7,11 +7,35 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* 样式完整保留，与之前最终版相同 */
+        /* 基础样式保持不变 */
         * { box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         body { background: #eef2f5; font-family: 'Segoe UI', '微软雅黑', Roboto, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-x: auto; }
         .invoice-container { position: relative; width: 210mm; min-width: 210mm; background: white; box-shadow: 0 20px 35px rgba(0,0,0,0.1); border-radius: 20px; padding: 12mm 15mm 15mm 15mm; margin-bottom: 24px; overflow: visible; user-select: none; }
-        @media print { body { background: white; padding: 0; margin: 0; } .invoice-container { box-shadow: none; padding: 0; margin: 0; border-radius: 0 !important; width: 100%; min-width: auto; } .btn-group, .control-panel, .remark-box button { display: none !important; } .brand-overlay, .company-stamp { opacity: 0.9 !important; } }
+        
+        /* 打印样式修复：保持与屏幕一致的宽度和定位，确保品牌图和公司章位置正确 */
+        @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .invoice-container { 
+                box-shadow: none; 
+                padding: 12mm 15mm 15mm 15mm; 
+                margin: 0 auto; 
+                border-radius: 0 !important; 
+                width: 210mm !important;   /* 固定宽度，与屏幕一致 */
+                min-width: 210mm !important;
+                max-width: 210mm !important;
+                overflow: visible !important;
+            }
+            .btn-group, .control-panel, .remark-box button { display: none !important; }
+            .brand-overlay, .company-stamp { 
+                opacity: 0.9 !important; 
+                display: inline-block !important;
+                position: absolute !important;
+            }
+            .table-wrapper { overflow-x: visible !important; }
+            .sales-table { width: 100% !important; min-width: 0 !important; table-layout: auto !important; }
+            .sales-table th, .sales-table td { word-break: break-word !important; white-space: normal !important; }
+        }
+        
         .brand-overlay { position: absolute; z-index: 20; cursor: grab; height: auto; object-fit: contain; border-radius: 8px; opacity: 0.9; user-select: none; touch-action: none; }
         .brand-overlay.dragging, .company-stamp.dragging { cursor: grabbing; opacity: 0.7; }
         .company-stamp { position: absolute; object-fit: contain; opacity: 0.85; z-index: 9999; cursor: grab; background: transparent; pointer-events: auto; touch-action: none; right: 30px; bottom: 60px; left: auto; top: auto; display: none; }
@@ -63,7 +87,6 @@
         .table-wrapper { border-radius: 0; overflow-x: auto; border: 2px solid #1e2f3a; background: #fff; margin-top: 8px; }
         .sales-table { width: 100%; border-collapse: collapse; font-size: 14px; font-family: 'Segoe UI', 'Consolas', monospace; min-width: 500px; }
         .sales-table th, .sales-table td { border: 2px solid #1e2f3a; padding: 8px 6px; vertical-align: middle; text-align: center; }
-        /* 调整列宽：单价列加宽，并确保横版显示不换行 */
         .sales-table th:nth-child(1) { width: 45px; }
         .sales-table th:nth-child(2) { width: auto; }
         .sales-table th:nth-child(3) { width: 60px; }
@@ -659,22 +682,70 @@
             pdf.save(`销售单_${document.getElementById('invoiceNo').innerText}.pdf`); 
         }catch(e){ alert('PDF生成失败: ' + e.message); }finally{ btn.innerText=orig; btn.disabled=false; } 
     }
-    async function printInvoice(){ 
-        const btn=document.getElementById('printBtn'), orig=btn.innerText; 
-        btn.innerText='准备打印...'; btn.disabled=true; 
-        try{ 
+    
+    // 修复打印功能：使用克隆窗口方式，避免卡死，同时保留打印样式
+    async function printInvoice() {
+        const btn = document.getElementById('printBtn'), orig = btn.innerText;
+        btn.innerText = '准备打印...';
+        btn.disabled = true;
+        try {
             const clone = getCleanClone();
-            const win=window.open('','_blank'); 
-            if(!win){ alert('请允许弹窗'); return; } 
-            clone.style.width='100%'; clone.style.margin='0 auto'; 
+            const win = window.open('', '_blank');
+            if (!win) {
+                alert('请允许弹窗，否则无法打印');
+                return;
+            }
+            // 设置克隆容器宽度为100%，适应打印页面
+            clone.style.width = '100%';
+            clone.style.margin = '0 auto';
+            // 收集页面所有样式
             const styles = Array.from(document.styleSheets).reduce((acc, sheet) => {
-                try { const rules = sheet.cssRules || sheet.rules; if (rules) for (let rule of rules) acc += rule.cssText; } catch(e) {}
+                try {
+                    const rules = sheet.cssRules || sheet.rules;
+                    if (rules) {
+                        for (let rule of rules) {
+                            acc += rule.cssText;
+                        }
+                    }
+                } catch(e) {}
                 return acc;
             }, '');
-            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel, .btn-group, .remark-box button { display:none; } .selected-row { background-color: transparent !important; } .selected-row td:first-child { background-color: transparent !important; }</style></head><body><div style="max-width:210mm;margin:0 auto;">${clone.outerHTML}</div></body></html>`);
+            win.document.write(`<!DOCTYPE html>
+            <html>
+            <head>
+                <title>销售单打印</title>
+                <style>${styles}
+                    /* 打印时额外确保图片位置正确 */
+                    .brand-overlay, .company-stamp {
+                        position: absolute !important;
+                        display: inline-block !important;
+                    }
+                    .control-panel, .btn-group, .remark-box button {
+                        display: none !important;
+                    }
+                    .selected-row {
+                        background-color: transparent !important;
+                    }
+                    .selected-row td:first-child {
+                        background-color: transparent !important;
+                    }
+                </style>
+            </head>
+            <body style="margin:0; padding:0; display:flex; justify-content:center;">
+                <div style="max-width:210mm; margin:0 auto;">${clone.outerHTML}</div>
+            </body>
+            </html>`);
             win.document.close();
-            win.onload = () => win.print();
-        } catch(e){ alert('打印失败: ' + e.message); } finally{ btn.innerText=orig; btn.disabled=false; } 
+            win.onload = () => {
+                win.print();
+                win.onafterprint = () => win.close();
+            };
+        } catch(e) {
+            alert('打印失败: ' + e.message);
+        } finally {
+            btn.innerText = orig;
+            btn.disabled = false;
+        }
     }
     
     function initRemark(){ document.getElementById('editRemarkBtn').onclick=()=>{ let v=prompt("编辑备注",document.getElementById('remarkText').innerText); if(v!==null){ document.getElementById('remarkText').innerText=v.trim()||"—"; saveToLocalStorage(); } }; }
