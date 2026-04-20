@@ -3,90 +3,395 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>智能销售单生成器 - A4标准版</title>
+    <title>智能销售单生成器 - A4专业版(大按钮)</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* 基础样式保持不变 */
-        * { box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-        body { background: #eef2f5; font-family: 'Segoe UI', '微软雅黑', Roboto, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-x: auto; }
-        .invoice-container { position: relative; width: 210mm; min-width: 210mm; background: white; box-shadow: 0 20px 35px rgba(0,0,0,0.1); border-radius: 20px; padding: 12mm 15mm 15mm 15mm; margin-bottom: 24px; overflow: visible; user-select: none; }
-        
-        /* 打印样式修复：保持与屏幕一致的宽度和定位，确保品牌图和公司章位置正确 */
+        * {
+            box-sizing: border-box;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+        body {
+            background: #eef2f5;
+            font-family: 'Segoe UI', '微软雅黑', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: auto;
+        }
+        .invoice-container {
+            position: relative;
+            width: 210mm;
+            min-width: 210mm;
+            background: white;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 12mm 15mm 15mm 15mm;
+            margin-bottom: 24px;
+            overflow: visible;
+            user-select: none;
+        }
         @media print {
             body { background: white; padding: 0; margin: 0; }
-            .invoice-container { 
-                box-shadow: none; 
-                padding: 12mm 15mm 15mm 15mm; 
-                margin: 0 auto; 
-                border-radius: 0 !important; 
-                width: 210mm !important;   /* 固定宽度，与屏幕一致 */
-                min-width: 210mm !important;
-                max-width: 210mm !important;
-                overflow: visible !important;
-            }
+            .invoice-container { box-shadow: none; padding: 12mm 15mm 15mm 15mm; margin: 0 auto; border-radius: 0 !important; width: 210mm !important; min-width: 210mm !important; max-width: 210mm !important; overflow: visible !important; position: relative; }
             .btn-group, .control-panel, .remark-box button { display: none !important; }
-            .brand-overlay, .company-stamp { 
-                opacity: 0.9 !important; 
-                display: inline-block !important;
-                position: absolute !important;
-            }
+            .brand-overlay, .company-stamp { opacity: 0.9 !important; display: inline-block !important; position: absolute !important; }
             .table-wrapper { overflow-x: visible !important; }
             .sales-table { width: 100% !important; min-width: 0 !important; table-layout: auto !important; }
             .sales-table th, .sales-table td { word-break: break-word !important; white-space: normal !important; }
         }
-        
-        .brand-overlay { position: absolute; z-index: 20; cursor: grab; height: auto; object-fit: contain; border-radius: 8px; opacity: 0.9; user-select: none; touch-action: none; }
-        .brand-overlay.dragging, .company-stamp.dragging { cursor: grabbing; opacity: 0.7; }
-        .company-stamp { position: absolute; object-fit: contain; opacity: 0.85; z-index: 9999; cursor: grab; background: transparent; pointer-events: auto; touch-action: none; right: 30px; bottom: 60px; left: auto; top: auto; display: none; }
-        .sign-line { position: relative; flex-shrink: 0; font-size: 14px; display: inline-block; padding: 4px 8px; white-space: nowrap; }
-        .control-panel { width: 210mm; min-width: 210mm; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e2edf2; overflow: hidden; }
-        .tab-buttons { display: flex; background: #f8fafc; border-bottom: 1px solid #e2edf2; }
-        .tab-btn { flex: 1; text-align: center; padding: 14px 0; background: transparent; border: none; font-size: 15px; font-weight: 600; color: #4a627a; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; }
-        .tab-btn.active { color: #2c7da0; border-bottom-color: #2c7da0; background: white; }
-        .tab-pane { display: none; padding: 24px; background: white; }
-        .tab-pane.active-pane { display: block; }
-        .info-edit-panel { display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: flex-end; }
-        .info-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-        .info-field label { font-size: 14px; font-weight: 600; color: #4a627a; }
-        .info-field input { padding: 10px 14px; border-radius: 12px; border: 1px solid #cddfe7; font-size: 14px; background: white; outline: none; width: 100%; }
-        .add-remove-panel { display: flex; flex-direction: column; gap: 24px; }
-        .add-goods-form { background: #fefcf5; border-radius: 20px; padding: 20px; border: 1px solid #e9e5d5; }
-        .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-        .form-field { flex: 1; min-width: 100px; }
-        .form-field label { font-size: 14px; font-weight: 600; color: #4a627a; display: block; margin-bottom: 4px; }
-        .form-field input, .form-field select { width: 100%; padding: 10px 14px; border-radius: 32px; border: 1px solid #cddfe7; font-size: 14px; background: white; line-height: normal; }
-        .add-btn { background: #2c7da0; color: white; border: none; padding: 10px 24px; border-radius: 32px; font-weight: bold; cursor: pointer; height: 42px; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-size: 14px; }
+        .brand-overlay {
+            position: absolute;
+            z-index: 20;
+            cursor: grab;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            opacity: 0.9;
+            user-select: none;
+            touch-action: none;
+        }
+        .brand-overlay.dragging, .company-stamp.dragging {
+            cursor: grabbing;
+            opacity: 0.7;
+        }
+        .company-stamp {
+            position: absolute;
+            object-fit: contain;
+            opacity: 0.85;
+            z-index: 9999;
+            cursor: grab;
+            background: transparent;
+            pointer-events: auto;
+            touch-action: none;
+            right: 30px;
+            bottom: 60px;
+            left: auto;
+            top: auto;
+            display: none;
+        }
+        .sign-line {
+            position: relative;
+            flex-shrink: 0;
+            font-size: 14px;
+            display: inline-block;
+            padding: 4px 8px;
+            white-space: nowrap;
+        }
+        .control-panel {
+            width: 210mm;
+            min-width: 210mm;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            border: 1px solid #e2edf2;
+            overflow: hidden;
+        }
+        .tab-buttons {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2edf2;
+        }
+        .tab-btn {
+            flex: 1;
+            text-align: center;
+            padding: 14px 0;
+            background: transparent;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            color: #4a627a;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-btn.active {
+            color: #2c7da0;
+            border-bottom-color: #2c7da0;
+            background: white;
+        }
+        .tab-pane {
+            display: none;
+            padding: 24px;
+            background: white;
+        }
+        .tab-pane.active-pane {
+            display: block;
+        }
+        .info-edit-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 20px;
+            align-items: flex-end;
+        }
+        .info-field {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .info-field label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a627a;
+        }
+        .info-field input {
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid #cddfe7;
+            font-size: 14px;
+            background: white;
+            outline: none;
+            width: 100%;
+        }
+        .add-remove-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .add-goods-form {
+            background: #fefcf5;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #e9e5d5;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .form-field {
+            flex: 1;
+            min-width: 100px;
+        }
+        .form-field label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a627a;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .form-field input, .form-field select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 32px;
+            border: 1px solid #cddfe7;
+            font-size: 14px;
+            background: white;
+            line-height: normal;
+        }
+        .add-btn {
+            background: #2c7da0;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            font-size: 14px;
+        }
         .add-btn:hover { background: #1f5e7a; }
-        .action-buttons { background: #fefcf5; border-radius: 20px; padding: 20px; border: 1px solid #e9e5d5; display: flex; flex-direction: row; gap: 24px; align-items: stretch; }
-        .btn-group-row { flex: 1; display: flex; flex-direction: column; gap: 12px; background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #edf2f7; }
-        .btn-group-title { font-size: 14px; font-weight: 700; color: #2c7da0; margin-bottom: 4px; border-left: 3px solid #2c7da0; padding-left: 10px; }
-        .btn-group-row .action-icon-btn, .btn-group-row .btn-sm { width: 100%; text-align: center; justify-content: center; margin: 0; }
-        .btn-sm { background: #2c7da0; border: none; color: white; padding: 8px 20px; border-radius: 32px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .action-buttons {
+            background: #fefcf5;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #e9e5d5;
+            display: flex;
+            flex-direction: row;
+            gap: 24px;
+            align-items: stretch;
+        }
+        .btn-group-row {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #edf2f7;
+        }
+        .btn-group-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #2c7da0;
+            margin-bottom: 4px;
+            border-left: 3px solid #2c7da0;
+            padding-left: 10px;
+        }
+        .btn-group-row .action-icon-btn, .btn-group-row .btn-sm {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+            margin: 0;
+        }
+        .btn-sm {
+            background: #2c7da0;
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 32px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
         .btn-sm-danger { background: #bc6c25; }
         .btn-sm:hover { background: #1f5e7a; }
         .btn-sm-danger:hover { background: #9e561a; }
-        .action-icon-btn { background: #eef2f7; border: 1px solid #cbd5e1; color: #1e4663; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 32px; cursor: pointer; transition: 0.2s; }
+        .action-icon-btn {
+            background: #eef2f7;
+            border: 1px solid #cbd5e1;
+            color: #1e4663;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 32px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
         .action-icon-btn:hover { background: #e2e8f0; border-color: #2c7da0; }
         .action-icon-btn.danger { color: #bc6c25; border-color: #f1d5b5; }
         .action-icon-btn.danger:hover { background: #fff1e6; }
-        .action-icon-btn.disabled { opacity: 0.5; pointer-events: none; background: #f1f5f9; }
-        .img-manager-group { display: flex; flex-direction: column; gap: 24px; align-items: flex-start; }
-        .img-card { width: 100%; background: #f9fafb; padding: 16px 20px; border-radius: 20px; border: 1px solid #e2edf2; display: flex; flex-direction: column; gap: 12px; }
-        .img-card > div:first-child { font-size: 14px; font-weight: 600; margin-bottom: 0; }
-        .img-card .control-row { display: flex; flex-wrap: nowrap; gap: 12px; align-items: center; justify-content: flex-start; }
-        .size-control { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; padding: 5px 12px; border-radius: 32px; white-space: nowrap; }
-        .size-control input { width: 70px; padding: 4px 8px; border-radius: 20px; border: 1px solid #cddfe7; font-size: 14px; text-align: center; }
-        .batch-parse { background: #f9fafb; border-radius: 20px; padding: 20px; border: 1px solid #e2edf2; }
-        .batch-title { font-weight: 700; color: #1e4663; margin-bottom: 16px; font-size: 16px; }
-        .batch-textarea { width: 100%; padding: 14px 16px; border-radius: 16px; border: 1px solid #cbd5e1; font-family: monospace; font-size: 14px; resize: vertical; background: white; min-height: 120px; }
-        .batch-preview { background: #ffffff; border-radius: 16px; margin-top: 16px; padding: 12px; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto; }
-        .preview-item { background: #f1f5f9; border-radius: 40px; padding: 6px 14px; margin: 6px 0; font-size: 13px; display: inline-block; margin-right: 8px; }
-        .batch-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
-        .btn-outline { background: transparent; border: 1px solid #2c7da0; color: #2c7da0; padding: 6px 16px; border-radius: 32px; font-weight: bold; cursor: pointer; font-size: 14px; }
-        .table-wrapper { border-radius: 0; overflow-x: auto; border: 2px solid #1e2f3a; background: #fff; margin-top: 8px; }
-        .sales-table { width: 100%; border-collapse: collapse; font-size: 14px; font-family: 'Segoe UI', 'Consolas', monospace; min-width: 500px; }
-        .sales-table th, .sales-table td { border: 2px solid #1e2f3a; padding: 8px 6px; vertical-align: middle; text-align: center; }
+        .action-icon-btn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            background: #f1f5f9;
+        }
+        .img-manager-group {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            align-items: flex-start;
+        }
+        .img-card {
+            width: 100%;
+            background: #f9fafb;
+            padding: 16px 20px;
+            border-radius: 20px;
+            border: 1px solid #e2edf2;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .img-card > div:first-child {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+        .img-card .control-row {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .size-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            padding: 5px 12px;
+            border-radius: 32px;
+            white-space: nowrap;
+        }
+        .size-control input {
+            width: 70px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            border: 1px solid #cddfe7;
+            font-size: 14px;
+            text-align: center;
+        }
+        .batch-parse {
+            background: #f9fafb;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #e2edf2;
+        }
+        .batch-title {
+            font-weight: 700;
+            color: #1e4663;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+        .batch-textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #cbd5e1;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            background: white;
+            min-height: 120px;
+        }
+        .batch-preview {
+            background: #ffffff;
+            border-radius: 16px;
+            margin-top: 16px;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .preview-item {
+            background: #f1f5f9;
+            border-radius: 40px;
+            padding: 6px 14px;
+            margin: 6px 0;
+            font-size: 13px;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .batch-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #2c7da0;
+            color: #2c7da0;
+            padding: 6px 16px;
+            border-radius: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .table-wrapper {
+            border-radius: 0;
+            overflow-x: auto;
+            border: 2px solid #1e2f3a;
+            background: #fff;
+            margin-top: 8px;
+        }
+        .sales-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            font-family: 'Segoe UI', 'Consolas', monospace;
+            min-width: 500px;
+        }
+        .sales-table th, .sales-table td {
+            border: 2px solid #1e2f3a;
+            padding: 8px 6px;
+            vertical-align: middle;
+            text-align: center;
+        }
         .sales-table th:nth-child(1) { width: 45px; }
         .sales-table th:nth-child(2) { width: auto; }
         .sales-table th:nth-child(3) { width: 60px; }
@@ -95,44 +400,212 @@
         .sales-table th:nth-child(6) { width: 90px; }
         .sales-table th:nth-child(7) { width: auto; }
         .sales-table td:nth-child(5) { white-space: nowrap; }
-        .sales-table th { background-color: #e6eaef; font-weight: 800; }
-        .clickable-seq { cursor: pointer; background-color: #f0f7ff; font-weight: 600; }
+        .sales-table th {
+            background-color: #e6eaef;
+            font-weight: 800;
+        }
+        .clickable-seq {
+            cursor: pointer;
+            background-color: #f0f7ff;
+            font-weight: 600;
+        }
         .clickable-seq:hover { background-color: #d9e8ff; }
         .selected-row td:first-child { background-color: #cce5ff; font-weight: bold; }
         .selected-row { background-color: #f0f7ff; }
-        .header-info { text-align: center; margin-bottom: 12px; }
-        .company-title { font-size: 24px; font-weight: 800; color: #0b3b4f; margin-bottom: 4px; }
-        .sub-title { font-size: 13px; color: #2c3e50; }
-        .title-divider { border-bottom: 2px solid #1a4d6b; margin-bottom: 12px; }
-        .meta-row { display: flex; justify-content: space-between; align-items: center; background: #f4f7fa; padding: 8px 15px; border-radius: 12px; margin: 12px 0 12px 0; font-size: 13px; font-weight: 500; border: 1px solid #bac8d3; gap: 12px; flex-wrap: nowrap; }
-        .meta-item { display: flex; align-items: center; gap: 6px; }
+        .header-info {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .company-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0b3b4f;
+            margin-bottom: 4px;
+        }
+        .sub-title {
+            font-size: 13px;
+            color: #2c3e50;
+        }
+        .title-divider {
+            border-bottom: 2px solid #1a4d6b;
+            margin-bottom: 12px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f4f7fa;
+            padding: 8px 15px;
+            border-radius: 12px;
+            margin: 12px 0 12px 0;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #bac8d3;
+            gap: 12px;
+            flex-wrap: nowrap;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
         .meta-item:first-child { flex: 5; min-width: 0; }
-        .static-text { background: white; padding: 4px 12px; border-radius: 28px; border: 1px solid #b9cad6; color: #1f3b4c; white-space: nowrap; font-size: 13px; font-weight: 500; }
+        .static-text {
+            background: white;
+            padding: 4px 12px;
+            border-radius: 28px;
+            border: 1px solid #b9cad6;
+            color: #1f3b4c;
+            white-space: nowrap;
+            font-size: 13px;
+            font-weight: 500;
+        }
         #customerNameDisplay { font-size: 15px; padding: 5px 16px; }
-        .total-row { margin-top: 16px; background: #f8f9fc; padding: 10px 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid #dce5ec; flex-wrap: nowrap; }
-        .total-left { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
-        .total-left strong { font-size: 13px; color: #2c3e50; white-space: nowrap; }
-        .amount-chinese { font-size: 16px; font-weight: 700; color: #1e4663; background: white; padding: 3px 12px; border-radius: 28px; border: 1px solid #cbdbe0; font-family: '楷体', 'Microsoft YaHei', monospace; white-space: nowrap; }
-        .total-right { font-size: 20px; color: #c0392b; background: white; padding: 3px 15px; border-radius: 40px; font-family: monospace; font-weight: 800; border: 1px solid #d1d9e0; white-space: nowrap; }
-        .sign-stamp { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; border-top: 2px solid #3c5a6f; padding-top: 16px; gap: 15px; flex-wrap: nowrap; overflow-x: auto; width: 100%; }
+        .total-row {
+            margin-top: 16px;
+            background: #f8f9fc;
+            padding: 10px 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid #dce5ec;
+            flex-wrap: nowrap;
+        }
+        .total-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap;
+        }
+        .total-left strong {
+            font-size: 13px;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+        .amount-chinese {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e4663;
+            background: white;
+            padding: 3px 12px;
+            border-radius: 28px;
+            border: 1px solid #cbdbe0;
+            font-family: '楷体', 'Microsoft YaHei', monospace;
+            white-space: nowrap;
+        }
+        .total-right {
+            font-size: 20px;
+            color: #c0392b;
+            background: white;
+            padding: 3px 15px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-weight: 800;
+            border: 1px solid #d1d9e0;
+            white-space: nowrap;
+        }
+        .sign-stamp {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 24px;
+            border-top: 2px solid #3c5a6f;
+            padding-top: 16px;
+            gap: 15px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            width: 100%;
+        }
         .sign-left { flex-shrink: 0; text-align: left; }
-        .sign-right-group { flex-shrink: 0; display: flex; align-items: center; gap: 20px; justify-content: flex-start; text-align: left; }
-        .sign-note { font-size: 12px; color: #4a5568; letter-spacing: 1px; white-space: nowrap; }
-        .sign-invoice-no { font-weight: 500; color: #1f3b4c; font-size: 13px; white-space: nowrap; }
-        .remark-box { background: #f8f9fc; padding: 8px 15px; border-radius: 12px; margin: 14px 0 4px; font-size: 13px; border: 1px solid #dce5ec; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .remark-box button { background: transparent; color: #b45f1b; font-size: 11px; padding: 3px 10px; border: 1px solid #e2b87a; border-radius: 40px; cursor: pointer; }
+        .sign-right-group {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            justify-content: flex-start;
+            text-align: left;
+        }
+        .sign-note {
+            font-size: 12px;
+            color: #4a5568;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .sign-invoice-no {
+            font-weight: 500;
+            color: #1f3b4c;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .remark-box {
+            background: #f8f9fc;
+            padding: 8px 15px;
+            border-radius: 12px;
+            margin: 14px 0 4px;
+            font-size: 13px;
+            border: 1px solid #dce5ec;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .remark-box button {
+            background: transparent;
+            color: #b45f1b;
+            font-size: 11px;
+            padding: 3px 10px;
+            border: 1px solid #e2b87a;
+            border-radius: 40px;
+            cursor: pointer;
+        }
         .remark-box button:hover { background: #fff1e6; }
-        .btn-group { display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap; width: 210mm; min-width: 210mm; margin: 20px auto 10px auto; text-align: center; }
-        .btn-group button { border: none; color: white; font-size: 14px; padding: 8px 22px; border-radius: 48px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        
+        /* ========== 底部三按钮 显著增大 ========== */
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+            width: 210mm;
+            min-width: 210mm;
+            margin: 20px auto 10px auto;
+            text-align: center;
+        }
+        .btn-group button {
+            border: none;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 14px 32px;
+            border-radius: 56px;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            letter-spacing: 1px;
+        }
         #saveAsImageBtn { background: #2c7da0; }
-        #saveAsImageBtn:hover { background: #1f5e7a; }
+        #saveAsImageBtn:hover { background: #1f5e7a; transform: scale(1.02); }
         #downloadPdfBtn { background: #d9534f; }
-        #downloadPdfBtn:hover { background: #c9302c; }
+        #downloadPdfBtn:hover { background: #c9302c; transform: scale(1.02); }
         #printBtn { background: #5f6c7a; }
-        #printBtn:hover { background: #4a5568; }
+        #printBtn:hover { background: #4a5568; transform: scale(1.02); }
+        
         .footer-note-bottom { display: none; }
-        @media (max-width: 220mm) { body { padding: 10px; overflow-x: auto; justify-content: center; } .invoice-container, .control-panel, .btn-group { margin-left: auto; margin-right: auto; } .btn-group { gap: 12px; } .btn-group button { padding: 8px 18px; font-size: 13px; } }
-        @media (max-width: 480px) { .btn-group { gap: 10px; } .btn-group button { padding: 7px 14px; font-size: 12px; } }
+        
+        @media (max-width: 220mm) {
+            body { padding: 10px; overflow-x: auto; justify-content: center; }
+            .invoice-container, .control-panel, .btn-group { margin-left: auto; margin-right: auto; }
+            .btn-group { gap: 16px; }
+            .btn-group button { padding: 12px 24px; font-size: 16px; }
+        }
+        @media (max-width: 480px) {
+            .btn-group { gap: 12px; }
+            .btn-group button { padding: 10px 18px; font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -152,15 +625,7 @@
     <div class="table-wrapper">
         <table class="sales-table" id="salesTable">
             <thead>
-                <tr>
-                    <th style="width:45px">序号</th>
-                    <th>名称</th>
-                    <th style="width:60px">单位</th>
-                    <th style="width:70px">数量</th>
-                    <th style="width:100px">单价(元)</th>
-                    <th style="width:90px">金额(元)</th>
-                    <th>备注/类别</th>
-                </tr>
+                <tr><th style="width:45px">序号</th><th>名称</th><th style="width:60px">单位</th><th style="width:70px">数量</th><th style="width:100px">单价(元)</th><th style="width:90px">金额(元)</th><th>备注/类别</th></tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
@@ -224,7 +689,7 @@
 </div>
 
 <script>
-    // 选项卡
+    // ======================== 工具与数据 ========================
     function initTabs() {
         const tabs = document.querySelectorAll('.tab-btn');
         const panes = document.querySelectorAll('.tab-pane');
@@ -239,12 +704,11 @@
         });
     }
 
-    // 业务数据
     let items = []; 
     let selectedIndex = -1;
     const STANDARD_UNITS = new Set(['个','台','套','根','件','只','条','支','箱','包','瓶','盒','桶','双','对','米','千克','公斤','克','升','毫升','袋','卷','组','部','块','片','张','把','粒','罐','打','份','册','本','辆','架','顶','副','串','捆','扎','排','座','栋','扇','盏','枚','轴','码','英尺','英寸','厘米','毫米','GB','TB','张/包','个/箱','米/卷','台/套','箱/件','台/个','支/盒','卷/包','套/箱','项','次']);
-    const CHINESE_NUM_MAP = { '一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
     const STORAGE_KEY = 'SmartSalesInvoiceData';
+    
     function saveToLocalStorage() {
         try {
             const data = {
@@ -258,8 +722,9 @@
                 remark: document.getElementById('remarkText').innerText
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch(e) { console.warn('保存缓存失败', e); }
+        } catch(e) { console.warn(e); }
     }
+    
     function loadFromLocalStorage() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return false;
@@ -279,7 +744,7 @@
         } catch(e) { return false; }
     }
 
-    // 图片缓存（品牌图与公章图逻辑完全一致）
+    // 图片缓存逻辑 (品牌/公章)
     const BRAND_DATA_KEY = 'brandImageData';
     const BRAND_POS_KEY = 'brandImagePos';
     const BRAND_WIDTH_KEY = 'brandImageWidth';
@@ -291,25 +756,13 @@
         const brand = document.getElementById('brandImage');
         if (brand.src && brand.style.display !== 'none') {
             localStorage.setItem(BRAND_DATA_KEY, brand.src);
-            let left, top;
-            if (brand.style.left && brand.style.left !== 'auto') {
-                left = brand.style.left;
-                top = brand.style.top;
-            } else {
-                const containerRect = document.getElementById('invoiceContainer').getBoundingClientRect();
-                const rect = brand.getBoundingClientRect();
-                left = (rect.left - containerRect.left) + 'px';
-                top = (rect.top - containerRect.top) + 'px';
-            }
+            let left = brand.style.left, top = brand.style.top;
+            if (!left || left === 'auto') left = '20px';
+            if (!top || top === 'auto') top = '0px';
             localStorage.setItem(BRAND_POS_KEY, JSON.stringify({ left, top }));
             localStorage.setItem(BRAND_WIDTH_KEY, document.getElementById('brandWidth').value);
-        } else {
-            localStorage.removeItem(BRAND_DATA_KEY);
-            localStorage.removeItem(BRAND_POS_KEY);
-            localStorage.removeItem(BRAND_WIDTH_KEY);
-        }
+        } else { localStorage.removeItem(BRAND_DATA_KEY); localStorage.removeItem(BRAND_POS_KEY); localStorage.removeItem(BRAND_WIDTH_KEY); }
     }
-
     function restoreBrand() {
         const data = localStorage.getItem(BRAND_DATA_KEY);
         const posStr = localStorage.getItem(BRAND_POS_KEY);
@@ -318,46 +771,23 @@
             const brand = document.getElementById('brandImage');
             brand.src = data;
             brand.style.display = 'inline-block';
-            if (posStr) {
-                try {
-                    const pos = JSON.parse(posStr);
-                    brand.style.left = pos.left;
-                    brand.style.top = pos.top;
-                } catch(e) {}
-            }
-            if (widthVal) {
-                document.getElementById('brandWidth').value = widthVal;
-                brand.style.width = widthVal + 'px';
-                brand.style.height = 'auto';
-            }
+            if (posStr) { try { const pos = JSON.parse(posStr); brand.style.left = pos.left; brand.style.top = pos.top; } catch(e) {} }
+            if (widthVal) { document.getElementById('brandWidth').value = widthVal; brand.style.width = widthVal + 'px'; brand.style.height = 'auto'; }
             return true;
         }
         return false;
     }
-
     function saveStampState() {
         const stamp = document.getElementById('companyStamp');
         if (stamp.src && stamp.style.display !== 'none') {
             localStorage.setItem(STAMP_DATA_KEY, stamp.src);
-            let left, top;
-            if (stamp.style.left && stamp.style.left !== 'auto') {
-                left = stamp.style.left;
-                top = stamp.style.top;
-            } else {
-                const containerRect = document.getElementById('invoiceContainer').getBoundingClientRect();
-                const rect = stamp.getBoundingClientRect();
-                left = (rect.left - containerRect.left) + 'px';
-                top = (rect.top - containerRect.top) + 'px';
-            }
-            localStorage.setItem(STAMP_POS_KEY, JSON.stringify({ left, top }));
+            let right = stamp.style.right, bottom = stamp.style.bottom;
+            if (!right || right === 'auto') right = '30px';
+            if (!bottom || bottom === 'auto') bottom = '60px';
+            localStorage.setItem(STAMP_POS_KEY, JSON.stringify({ right, bottom }));
             localStorage.setItem(STAMP_WIDTH_KEY, document.getElementById('stampWidth').value);
-        } else {
-            localStorage.removeItem(STAMP_DATA_KEY);
-            localStorage.removeItem(STAMP_POS_KEY);
-            localStorage.removeItem(STAMP_WIDTH_KEY);
-        }
+        } else { localStorage.removeItem(STAMP_DATA_KEY); localStorage.removeItem(STAMP_POS_KEY); localStorage.removeItem(STAMP_WIDTH_KEY); }
     }
-
     function restoreStamp() {
         const data = localStorage.getItem(STAMP_DATA_KEY);
         const posStr = localStorage.getItem(STAMP_POS_KEY);
@@ -366,178 +796,33 @@
             const stamp = document.getElementById('companyStamp');
             stamp.src = data;
             stamp.style.display = 'inline-block';
-            if (posStr) {
-                try {
-                    const pos = JSON.parse(posStr);
-                    stamp.style.left = pos.left;
-                    stamp.style.top = pos.top;
-                    stamp.style.right = 'auto';
-                    stamp.style.bottom = 'auto';
-                } catch(e) {}
-            }
-            if (widthVal) {
-                document.getElementById('stampWidth').value = widthVal;
-                stamp.style.width = widthVal + 'px';
-                stamp.style.height = 'auto';
-            }
+            if (posStr) { try { const pos = JSON.parse(posStr); stamp.style.right = pos.right; stamp.style.bottom = pos.bottom; stamp.style.left = 'auto'; stamp.style.top = 'auto'; } catch(e) {} }
+            if (widthVal) { document.getElementById('stampWidth').value = widthVal; stamp.style.width = widthVal + 'px'; stamp.style.height = 'auto'; }
             return true;
         }
         return false;
     }
 
-    // 图片拖拽逻辑
-    const brandImage = document.getElementById('brandImage');
-    const brandInput = document.getElementById('brandInput');
-    const uploadBrandBtn = document.getElementById('uploadBrandBtn');
-    const removeBrandBtn = document.getElementById('removeBrandBtn');
-    const brandWidthInput = document.getElementById('brandWidth');
-    const applyBrandSizeBtn = document.getElementById('applyBrandSize');
-    const companyStamp = document.getElementById('companyStamp');
-    const stampInput = document.getElementById('stampInput');
-    const uploadStampBtn = document.getElementById('uploadStampBtn');
-    const removeStampBtn = document.getElementById('removeStampBtn');
-    const stampWidthInput = document.getElementById('stampWidth');
-    const applyStampSizeBtn = document.getElementById('applyStampSize');
-
-    function makeDraggable(element, getStartPos, setPos, onEndCallback) {
-        let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
-        function onStart(clientX, clientY) {
-            if (!element.src || element.style.display === 'none') return;
-            dragging = true;
-            startX = clientX; startY = clientY;
-            const pos = getStartPos();
-            startLeft = pos.left; startTop = pos.top;
-            element.classList.add('dragging');
-            document.body.style.userSelect = 'none';
-            document.body.style.touchAction = 'none';
-        }
-        function onMove(clientX, clientY) {
-            if (!dragging) return;
-            setPos(startLeft + (clientX - startX), startTop + (clientY - startY));
-        }
-        function onEnd() {
-            if (dragging) {
-                dragging = false;
-                element.classList.remove('dragging');
-                document.body.style.userSelect = '';
-                document.body.style.touchAction = '';
-                if (onEndCallback) onEndCallback();
-            }
-        }
-        element.addEventListener('mousedown', (e) => { e.preventDefault(); onStart(e.clientX, e.clientY); });
+    // 拖拽
+    function makeDraggable(el, getStart, setPos, onEnd) {
+        let drag = false, startX = 0, startY = 0, startL = 0, startT = 0;
+        const onStart = (clientX, clientY) => { if (!el.src || el.style.display === 'none') return; drag = true; startX = clientX; startY = clientY; const p = getStart(); startL = p.left; startT = p.top; el.classList.add('dragging'); document.body.style.userSelect = 'none'; };
+        const onMove = (clientX, clientY) => { if (!drag) return; setPos(startL + (clientX - startX), startT + (clientY - startY)); };
+        const onEndFn = () => { if (drag) { drag = false; el.classList.remove('dragging'); document.body.style.userSelect = ''; if (onEnd) onEnd(); } };
+        el.addEventListener('mousedown', (e) => { e.preventDefault(); onStart(e.clientX, e.clientY); });
         window.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
-        window.addEventListener('mouseup', onEnd);
-        element.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.touches[0]; onStart(t.clientX, t.clientY); }, { passive: false });
-        window.addEventListener('touchmove', (e) => { if(dragging) { e.preventDefault(); const t = e.touches[0]; onMove(t.clientX, t.clientY); } }, { passive: false });
-        window.addEventListener('touchend', onEnd);
-        window.addEventListener('touchcancel', onEnd);
+        window.addEventListener('mouseup', onEndFn);
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.touches[0]; onStart(t.clientX, t.clientY); }, { passive: false });
+        window.addEventListener('touchmove', (e) => { if(drag) { e.preventDefault(); const t = e.touches[0]; onMove(t.clientX, t.clientY); } }, { passive: false });
+        window.addEventListener('touchend', onEndFn); window.addEventListener('touchcancel', onEndFn);
     }
+    function getBrandPos() { let left = parseFloat(document.getElementById('brandImage').style.left) || 20, top = parseFloat(document.getElementById('brandImage').style.top) || 0; return { left, top }; }
+    function setBrandPos(l, t) { const img = document.getElementById('brandImage'); img.style.left = l + 'px'; img.style.top = t + 'px'; saveBrandState(); }
+    function getStampPos() { let left = parseFloat(document.getElementById('companyStamp').style.left) || 500, top = parseFloat(document.getElementById('companyStamp').style.top) || 600; return { left, top }; }
+    function setStampPos(l, t) { const st = document.getElementById('companyStamp'); st.style.left = l + 'px'; st.style.top = t + 'px'; st.style.right = 'auto'; st.style.bottom = 'auto'; }
+    function finalStampPos() { saveStampState(); }
     
-    function getBrandPos() {
-        let left = parseFloat(brandImage.style.left);
-        let top = parseFloat(brandImage.style.top);
-        if (isNaN(left)) left = 20;
-        if (isNaN(top)) top = 0;
-        return { left, top };
-    }
-    function setBrandPos(left, top) { 
-        brandImage.style.left = left + 'px'; 
-        brandImage.style.top = top + 'px'; 
-        saveBrandState();
-    }
-    
-    function getStampPos() {
-        let left = parseFloat(companyStamp.style.left);
-        let top = parseFloat(companyStamp.style.top);
-        if (isNaN(left)) {
-            const rect = companyStamp.getBoundingClientRect();
-            const containerRect = document.getElementById('invoiceContainer').getBoundingClientRect();
-            left = rect.left - containerRect.left;
-            top = rect.top - containerRect.top;
-            if (isNaN(left) || left < 0) left = 500;
-            if (isNaN(top) || top < 0) top = 620;
-        }
-        return { left, top };
-    }
-    function setStampPos(left, top) {
-        companyStamp.style.left = left + 'px';
-        companyStamp.style.top = top + 'px';
-        companyStamp.style.right = 'auto';
-        companyStamp.style.bottom = 'auto';
-        saveStampState();
-    }
-    
-    function setBrandSize() { 
-        let w = parseInt(brandWidthInput.value,10)||120; 
-        brandImage.style.width = w + 'px'; 
-        brandImage.style.height = 'auto'; 
-        saveBrandState();
-    }
-    function setStampSize() { 
-        let w = parseInt(stampWidthInput.value,10)||150; 
-        companyStamp.style.width = w + 'px'; 
-        companyStamp.style.height = 'auto'; 
-        saveStampState();
-    }
-    
-    uploadBrandBtn.addEventListener('click',()=>brandInput.click());
-    brandInput.addEventListener('change',(e)=>{ 
-        const file=e.target.files[0]; 
-        if(file && (file.type==='image/png'||file.type==='image/jpeg'||file.type==='image/jpg')){ 
-            const reader=new FileReader(); 
-            reader.onload=ev=>{ 
-                brandImage.src=ev.target.result; 
-                brandImage.style.display='inline-block';
-                brandImage.style.left = '20px';
-                brandImage.style.top = '0px';
-                setBrandSize(); 
-                saveBrandState();
-            }; 
-            reader.readAsDataURL(file); 
-        } else alert('请上传JPG/PNG图片'); 
-    });
-    removeBrandBtn.addEventListener('click',()=>{ 
-        brandImage.src=''; 
-        brandImage.style.display='none'; 
-        brandInput.value=''; 
-        localStorage.removeItem(BRAND_DATA_KEY);
-        localStorage.removeItem(BRAND_POS_KEY);
-        localStorage.removeItem(BRAND_WIDTH_KEY);
-    });
-    applyBrandSizeBtn.addEventListener('click',setBrandSize);
-    
-    uploadStampBtn.addEventListener('click',()=>stampInput.click());
-    stampInput.addEventListener('change',(e)=>{ 
-        const file=e.target.files[0]; 
-        if(file && (file.type==='image/png'||file.type==='image/jpeg')){ 
-            const reader=new FileReader(); 
-            reader.onload=ev=>{ 
-                companyStamp.src=ev.target.result; 
-                companyStamp.style.display='inline-block';
-                companyStamp.style.right = '30px';
-                companyStamp.style.bottom = '60px';
-                companyStamp.style.left = 'auto';
-                companyStamp.style.top = 'auto';
-                setStampSize(); 
-                saveStampState();
-            }; 
-            reader.readAsDataURL(file); 
-        } else alert('请上传JPG/PNG图片'); 
-    });
-    removeStampBtn.addEventListener('click',()=>{ 
-        companyStamp.src=''; 
-        companyStamp.style.display='none'; 
-        stampInput.value=''; 
-        localStorage.removeItem(STAMP_DATA_KEY);
-        localStorage.removeItem(STAMP_POS_KEY);
-        localStorage.removeItem(STAMP_WIDTH_KEY);
-    });
-    applyStampSizeBtn.addEventListener('click',setStampSize);
-    
-    makeDraggable(brandImage, getBrandPos, setBrandPos, saveBrandState);
-    makeDraggable(companyStamp, getStampPos, setStampPos, saveStampState);
-
-    // 业务函数
+    // 业务同步
     function syncEditableInfo() {
         document.getElementById('companyTitle').innerText = document.getElementById('editCompany').value || "销售单";
         document.getElementById('contactInfo').innerHTML = `联系电话：${document.getElementById('editPhone').value || ''} &nbsp;|&nbsp; 联系人：${document.getElementById('editContact').value || ''}`;
@@ -546,62 +831,14 @@
         saveToLocalStorage();
     }
     function setInvoiceMeta() { 
-        const d = new Date(); 
-        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+        const d = new Date(); const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
         const hours = String(d.getHours()).padStart(2,'0'), minutes = String(d.getMinutes()).padStart(2,'0');
         document.getElementById('headerInvoiceDate').innerText = `${y}-${m}-${day} ${hours}:${minutes}`;
-        const randomNum = Math.floor(Math.random()*1000);
-        document.getElementById('invoiceNo').innerText = `XS-${y}${m}${day}-${randomNum}`;
+        document.getElementById('invoiceNo').innerText = `XS-${y}${m}${day}-${Math.floor(Math.random()*1000)}`;
     }
-    function bindInfoEdits(){ 
-        ['editCompany','editPhone','editContact','editSigner','editCustomer'].forEach(id=>{ 
-            document.getElementById(id).addEventListener('input',syncEditableInfo); 
-        });
-    }
-    function convertCurrency(money) { 
-        if(isNaN(money)) return '零元整'; 
-        let num=Math.round(parseFloat(money)*100)/100; 
-        let fraction=['角','分'], digit=['零','壹','贰','叁','肆','伍','陆','柒','捌','玖'], unit=[['元','万','亿'],['','拾','佰','仟']]; 
-        let head=num<0?'负':''; 
-        num=Math.abs(num); 
-        let s=''; 
-        for(let i=0;i<fraction.length;i++){ 
-            let temp=(Math.floor(num*10*Math.pow(10,i))%10).toString(); 
-            if(temp!=='0') s+=digit[parseInt(temp)]+fraction[i]; 
-        } 
-        let integerPart=Math.floor(num); 
-        if(integerPart===0){ 
-            return (s===''?'零元整':'零元'+s); 
-        } 
-        let p=0,strInt=''; 
-        while(integerPart>0){ 
-            let part=integerPart%10000; 
-            if(part!==0){ 
-                let partStr='',partNum=part,thousand=0; 
-                while(partNum>0){ 
-                    let cur=partNum%10; 
-                    if(cur!==0) partStr=digit[cur]+unit[1][thousand]+partStr; 
-                    else if(partStr.length>0&&partStr[0]!=='零') partStr='零'+partStr; 
-                    partNum=Math.floor(partNum/10); 
-                    thousand++; 
-                } 
-                if(part<1000&&p>0&&strInt!==''&&strInt[0]!=='零') partStr='零'+partStr; 
-                strInt=partStr+(p===0?'':unit[0][p])+strInt; 
-            } 
-            p++; 
-            integerPart=Math.floor(integerPart/10000); 
-        } 
-        if(s==='') s='整'; 
-        return head+strInt+'元'+s; 
-    }
-    function getSubtotal() { return items.reduce((sum, it) => sum + it.qty * it.price, 0); }
-    function updateTotal() {
-        let subtotal = getSubtotal();
-        document.getElementById('amountTotal').innerText = subtotal.toFixed(2);
-        document.getElementById('amountCN').innerHTML = convertCurrency(subtotal);
-        updateButtonsState();
-        saveToLocalStorage();
-    }
+    function convertCurrency(money) { if(isNaN(money)) return '零元整'; let num=Math.round(parseFloat(money)*100)/100; let fraction=['角','分'], digit=['零','壹','贰','叁','肆','伍','陆','柒','捌','玖']; let head=num<0?'负':''; num=Math.abs(num); let s=''; for(let i=0;i<fraction.length;i++){ let temp=(Math.floor(num*10*Math.pow(10,i))%10).toString(); if(temp!=='0') s+=digit[parseInt(temp)]+fraction[i]; } let integerPart=Math.floor(num); if(integerPart===0){ return (s===''?'零元整':'零元'+s); } let p=0,strInt=''; let tmp=integerPart; while(tmp>0){ let part=tmp%10000; if(part!==0){ let partStr='',partNum=part,thousand=0; while(partNum>0){ let cur=partNum%10; if(cur!==0) partStr=digit[cur]+['','拾','佰','仟'][thousand]+partStr; else if(partStr.length>0&&partStr[0]!=='零') partStr='零'+partStr; partNum=Math.floor(partNum/10); thousand++; } if(part<1000&&p>0&&strInt!==''&&strInt[0]!=='零') partStr='零'+partStr; strInt=partStr+(p===0?'':['元','万','亿'][p])+strInt; } p++; tmp=Math.floor(tmp/10000); } if(s==='') s='整'; return head+strInt+'元'+s; }
+    function getSubtotal() { return items.reduce((s, it) => s + it.qty * it.price, 0); }
+    function updateTotal() { let sub = getSubtotal(); document.getElementById('amountTotal').innerText = sub.toFixed(2); document.getElementById('amountCN').innerHTML = convertCurrency(sub); updateButtonsState(); saveToLocalStorage(); }
     function renderTable(){ 
         const tbody=document.getElementById('tableBody'); tbody.innerHTML=''; 
         if(items.length===0){ selectedIndex=-1; const row=tbody.insertRow(); row.insertCell(0).colSpan=7; row.cells[0].style.textAlign='center'; row.cells[0].style.padding='32px'; row.cells[0].innerText='✨ 暂无商品，请添加商品 ✨'; updateTotal(); updateButtonsState(); saveToLocalStorage(); return; }
@@ -618,186 +855,143 @@
     function saveEditToSelected(){ if(selectedIndex<0||!items[selectedIndex]){ alert('请先选中要修改的商品'); return; } let name=document.getElementById('prodName').value.trim(); if(!name){ alert("商品名称不能为空"); return; } let unit=document.getElementById('prodUnit').value.trim()||"个"; let qty=parseFloat(document.getElementById('prodQty').value); if(isNaN(qty)||qty<=0){ alert("数量必须大于0"); return; } let price=parseFloat(document.getElementById('prodPrice').value); if(isNaN(price)||price<0){ alert("单价不能为负数"); return; } let remark=document.getElementById('prodRemark').value.trim(); items[selectedIndex]={name,unit,qty,price,remark}; renderTable(); alert(`商品「${name}」已修改`); }
     
     // 批量解析
-    function extractPrice(text){ let match=text.match(/(\d+(?:\.\d{1,2})?)\s*元?\s*$/); if(match) return {price:parseFloat(match[1]), rest:text.substring(0,match.index).trim()}; return null; }
-    function extractQuantityUnitFromEnd(text){ let patterns=[/(\d+(?:\.\d+)?)\s*([a-zA-Z\u4e00-\u9fa5]{1,4})$/, /([一二两三四五六七八九十]+)\s*([a-zA-Z\u4e00-\u9fa5]{1,4})$/]; for(let p of patterns){ let match=text.match(p); if(match){ let qtyStr=match[1], unit=match[2]; let qty=1; if(/^\d+(?:\.\d+)?$/.test(qtyStr)) qty=parseFloat(qtyStr); else if(CHINESE_NUM_MAP[qtyStr]) qty=CHINESE_NUM_MAP[qtyStr]; if(qty>0 && STANDARD_UNITS.has(unit)){ let before=text.substring(0,match.index).trim(); if(before.length>0 && before.slice(-1).match(/[xX*]/)) continue; return {qty, unit, rest:before}; } } }
-        let anyMatch=text.match(/(?:^|\s)(\d+(?:\.\d+)?)\s+([a-zA-Z\u4e00-\u9fa5]{1,4})(?=\s|$)/); if(anyMatch){ let qty=parseFloat(anyMatch[1]), unit=anyMatch[2]; if(qty>0 && STANDARD_UNITS.has(unit)){ let before=text.substring(0,anyMatch.index).trim(); let after=text.substring(anyMatch.index+anyMatch[0].length).trim(); return {qty,unit,rest:(before+' '+after).trim()}; } } return {qty:1, unit:'个', rest:text}; }
-    function parseProductLine(line){ line=line.trim(); if(!line) return null; let priceInfo=extractPrice(line); if(!priceInfo) return null; let totalPrice=priceInfo.price; let remaining=priceInfo.rest; let {qty, unit, rest}=extractQuantityUnitFromEnd(remaining); let name=rest.trim(); if(!name) name="商品"; for(let u of STANDARD_UNITS) if(name.endsWith(u)){ name=name.substring(0,name.length-u.length).trim(); break; } if(name==="") name=rest; let unitPrice=totalPrice; if(qty>0) unitPrice=Math.round((totalPrice/qty)*100)/100; return {name, unit, qty:qty>0?qty:1, price:unitPrice}; }
     let parsedBuffer=[];
-    function parseBatch(){ const raw=document.getElementById('batchRawInput').value; const lines=raw.split(/\r?\n/); let results=[]; for(let line of lines){ line=line.trim(); if(!line) continue; let parsed=parseProductLine(line); if(parsed) results.push(parsed); } parsedBuffer=results; const previewDiv=document.getElementById('parsePreview'); if(results.length===0) previewDiv.innerHTML='<div style="color:#e67e22;">⚠️ 未能识别有效商品</div>'; else previewDiv.innerHTML=results.map(p=>`<div class="preview-item">✅ ${p.name} &nbsp; ${p.qty}${p.unit} &nbsp; ¥${p.price.toFixed(2)} (小计: ${(p.qty*p.price).toFixed(2)})</div>`).join(''); return results; }
+    function extractPrice(t){ let m=t.match(/(\d+(?:\.\d{1,2})?)\s*元?\s*$/); if(m) return {price:parseFloat(m[1]), rest:t.substring(0,m.index).trim()}; return null; }
+    function extractQuantityUnitFromEnd(t){ let p=/(\d+(?:\.\d+)?)\s*([a-zA-Z\u4e00-\u9fa5]{1,4})$/; let m=t.match(p); if(m){ let qty=parseFloat(m[1]), unit=m[2]; if(qty>0 && STANDARD_UNITS.has(unit)){ let rest=t.substring(0,m.index).trim(); return {qty, unit, rest}; } } return {qty:1, unit:'个', rest:t}; }
+    function parseProductLine(line){ line=line.trim(); if(!line) return null; let priceInfo=extractPrice(line); if(!priceInfo) return null; let totalPrice=priceInfo.price; let {qty,unit,rest}=extractQuantityUnitFromEnd(priceInfo.rest); let name=rest.trim(); if(!name) name="商品"; for(let u of STANDARD_UNITS) if(name.endsWith(u)){ name=name.substring(0,name.length-u.length).trim(); break; } if(name==="") name=rest; let unitPrice=Math.round((totalPrice/qty)*100)/100; return {name, unit, qty:qty>0?qty:1, price:unitPrice}; }
+    function parseBatch(){ const raw=document.getElementById('batchRawInput').value; const lines=raw.split(/\r?\n/); let res=[]; for(let line of lines){ line=line.trim(); if(!line) continue; let p=parseProductLine(line); if(p) res.push(p); } parsedBuffer=res; const previewDiv=document.getElementById('parsePreview'); if(res.length===0) previewDiv.innerHTML='<div style="color:#e67e22;">⚠️ 未能识别有效商品</div>'; else previewDiv.innerHTML=res.map(p=>`<div class="preview-item">✅ ${p.name} &nbsp; ${p.qty}${p.unit} &nbsp; ¥${p.price.toFixed(2)} (小计: ${(p.qty*p.price).toFixed(2)})</div>`).join(''); return res; }
     function confirmAddBatch(){ if(parsedBuffer.length===0){ alert('没有解析成功的商品，请先点击“智能解析预览”'); return; } for(let prod of parsedBuffer) items.push({...prod, remark:''}); if(items.length>0 && selectedIndex===-1) selectedIndex=0; renderTable(); parsedBuffer=[]; document.getElementById('parsePreview').innerHTML='<div style="color:#2e7d64;">✅ 已成功添加</div>'; document.getElementById('batchRawInput').value=''; }
     
-    // 导出用克隆（移除选中样式）
-    function getCleanClone() {
+    // 修正：公章上移3mm (约11.34px)
+    const STAMP_OFFSET_PX = 3 * 96 / 25.4;
+    function getCleanClone(offsetStampUp = false) {
         const original = document.getElementById('invoiceContainer');
         const clone = original.cloneNode(true);
-        const editBtn = clone.querySelector('#editRemarkBtn');
-        if (editBtn) editBtn.remove();
-        clone.querySelectorAll('.selected-row').forEach(row => row.classList.remove('selected-row'));
-        clone.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-        clone.querySelectorAll('tr').forEach(tr => { if (tr.classList.contains('selected-row')) tr.classList.remove('selected-row'); });
-        clone.querySelectorAll('td').forEach(td => { td.style.backgroundColor = ''; });
+        const editBtn = clone.querySelector('#editRemarkBtn'); if(editBtn) editBtn.remove();
+        clone.querySelectorAll('.selected-row').forEach(r=>r.classList.remove('selected-row'));
+        
+        const origBrand = document.getElementById('brandImage'), cloneBrand = clone.querySelector('#brandImage');
+        if(origBrand && origBrand.style.display !== 'none' && cloneBrand) {
+            cloneBrand.style.left = origBrand.offsetLeft + 'px';
+            cloneBrand.style.top = origBrand.offsetTop + 'px';
+            cloneBrand.style.right = 'auto';
+            cloneBrand.style.bottom = 'auto';
+            cloneBrand.style.width = origBrand.offsetWidth + 'px';
+        }
+        const origStamp = document.getElementById('companyStamp'), cloneStamp = clone.querySelector('#companyStamp');
+        if(origStamp && origStamp.style.display !== 'none' && cloneStamp) {
+            let stampTop = origStamp.offsetTop;
+            if(offsetStampUp) {
+                stampTop = stampTop - STAMP_OFFSET_PX;
+                if(stampTop < 0) stampTop = 0;
+            }
+            cloneStamp.style.left = origStamp.offsetLeft + 'px';
+            cloneStamp.style.top = stampTop + 'px';
+            cloneStamp.style.right = 'auto';
+            cloneStamp.style.bottom = 'auto';
+            cloneStamp.style.width = origStamp.offsetWidth + 'px';
+        }
+        clone.style.transform = 'none';
         return clone;
     }
     
     async function saveImage(){ 
-        const btn=document.getElementById('saveAsImageBtn'), orig=btn.innerText; 
+        const btn=document.getElementById('saveAsImageBtn'), txt=btn.innerText; 
         btn.innerText='生成中...'; btn.disabled=true; 
         try{ 
-            const clone = getCleanClone();
-            clone.style.position='absolute'; clone.style.top='-9999px'; clone.style.left='-9999px'; 
+            const clone = getCleanClone(true);
+            clone.style.position='absolute'; clone.style.top='-9999px'; 
             document.body.appendChild(clone); 
+            clone.offsetHeight;
             const canvas = await html2canvas(clone, { scale: 3, backgroundColor: '#fff', logging: false });
             document.body.removeChild(clone);
             const link=document.createElement('a'); 
             link.download=`销售单_${document.getElementById('invoiceNo').innerText}.png`; 
             link.href=canvas.toDataURL(); 
             link.click(); 
-        }catch(e){ alert('生成图片失败: ' + e.message); }finally{ btn.innerText=orig; btn.disabled=false; } 
+        }catch(e){ alert('生成图片失败: ' + e.message); }finally{ btn.innerText=txt; btn.disabled=false; } 
     }
+    
     async function downloadPDF(){ 
-        const btn=document.getElementById('downloadPdfBtn'), orig=btn.innerText; 
+        const btn=document.getElementById('downloadPdfBtn'), txt=btn.innerText; 
         btn.innerText='生成PDF...'; btn.disabled=true; 
         try{ 
-            const clone = getCleanClone();
+            const clone = getCleanClone(true);
             clone.style.position='absolute'; clone.style.top='-9999px'; 
             document.body.appendChild(clone); 
+            clone.offsetHeight;
             const canvas = await html2canvas(clone, { scale: 3, backgroundColor: '#fff', logging: false });
             document.body.removeChild(clone);
             const imgData = canvas.toDataURL('image/png');
-            const {jsPDF}=window.jspdf; 
-            const imgW=canvas.width, imgH=canvas.height, pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); 
-            const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight(), ratio=pdfW/imgW, imgHmm=imgH*ratio; 
-            if(imgHmm<=pdfH) pdf.addImage(imgData,'PNG',0,0,pdfW,imgHmm); 
-            else{ 
-                let remain=imgHmm, curY=0; 
-                while(remain>0){ 
-                    let sliceH=Math.min(pdfH,remain), sliceCanvas=document.createElement('canvas'), sliceW=imgW, sliceHpx=sliceH/ratio; 
-                    sliceCanvas.width=sliceW; sliceCanvas.height=sliceHpx; 
-                    sliceCanvas.getContext('2d').drawImage(canvas,0,curY,sliceW,sliceHpx,0,0,sliceW,sliceHpx); 
-                    pdf.addImage(sliceCanvas.toDataURL(),'PNG',0,0,pdfW,sliceH); 
-                    remain-=sliceH; curY+=sliceHpx; 
-                    if(remain>0) pdf.addPage(); 
-                } 
-            } 
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pdfW = pdf.internal.pageSize.getWidth();
+            const imgW = canvas.width, imgH = canvas.height;
+            const ratio = pdfW / imgW;
+            const imgHmm = imgH * ratio;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfW, imgHmm);
             pdf.save(`销售单_${document.getElementById('invoiceNo').innerText}.pdf`); 
-        }catch(e){ alert('PDF生成失败: ' + e.message); }finally{ btn.innerText=orig; btn.disabled=false; } 
+        }catch(e){ alert('PDF生成失败: ' + e.message); }finally{ btn.innerText=txt; btn.disabled=false; } 
     }
     
-    // 修复打印功能：使用克隆窗口方式，避免卡死，同时保留打印样式
-    async function printInvoice() {
-        const btn = document.getElementById('printBtn'), orig = btn.innerText;
-        btn.innerText = '准备打印...';
-        btn.disabled = true;
-        try {
-            const clone = getCleanClone();
-            const win = window.open('', '_blank');
-            if (!win) {
-                alert('请允许弹窗，否则无法打印');
-                return;
-            }
-            // 设置克隆容器宽度为100%，适应打印页面
-            clone.style.width = '100%';
-            clone.style.margin = '0 auto';
-            // 收集页面所有样式
-            const styles = Array.from(document.styleSheets).reduce((acc, sheet) => {
-                try {
-                    const rules = sheet.cssRules || sheet.rules;
-                    if (rules) {
-                        for (let rule of rules) {
-                            acc += rule.cssText;
-                        }
-                    }
-                } catch(e) {}
-                return acc;
-            }, '');
-            win.document.write(`<!DOCTYPE html>
-            <html>
-            <head>
-                <title>销售单打印</title>
-                <style>${styles}
-                    /* 打印时额外确保图片位置正确 */
-                    .brand-overlay, .company-stamp {
-                        position: absolute !important;
-                        display: inline-block !important;
-                    }
-                    .control-panel, .btn-group, .remark-box button {
-                        display: none !important;
-                    }
-                    .selected-row {
-                        background-color: transparent !important;
-                    }
-                    .selected-row td:first-child {
-                        background-color: transparent !important;
-                    }
-                </style>
-            </head>
-            <body style="margin:0; padding:0; display:flex; justify-content:center;">
-                <div style="max-width:210mm; margin:0 auto;">${clone.outerHTML}</div>
-            </body>
-            </html>`);
-            win.document.close();
-            win.onload = () => {
-                win.print();
-                win.onafterprint = () => win.close();
-            };
-        } catch(e) {
-            alert('打印失败: ' + e.message);
-        } finally {
-            btn.innerText = orig;
-            btn.disabled = false;
-        }
+    async function printInvoice(){ 
+        const btn=document.getElementById('printBtn'), txt=btn.innerText; 
+        btn.innerText='准备打印...'; btn.disabled=true; 
+        try{ 
+            const clone = getCleanClone(false);
+            const win=window.open('','_blank'); 
+            if(!win){ alert('请允许弹窗'); return; } 
+            const styles=Array.from(document.styleSheets).reduce((acc,sheet)=>{ try{ const rules=sheet.cssRules||sheet.rules; if(rules) for(let r of rules) acc+=r.cssText; }catch(e){} return acc; },''); 
+            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} .control-panel,.btn-group,.remark-box button{display:none!important;} .brand-overlay,.company-stamp{position:absolute!important;}</style></head><body style="margin:0;display:flex;justify-content:center;"><div style="width:210mm;margin:0 auto;">${clone.outerHTML}</div></body></html>`); 
+            win.document.close(); 
+            win.onload=()=>{ win.print(); win.onafterprint=()=>win.close(); }; 
+        }catch(e){ alert('打印失败: ' + e.message); }finally{ btn.innerText=txt; btn.disabled=false; } 
     }
     
-    function initRemark(){ document.getElementById('editRemarkBtn').onclick=()=>{ let v=prompt("编辑备注",document.getElementById('remarkText').innerText); if(v!==null){ document.getElementById('remarkText').innerText=v.trim()||"—"; saveToLocalStorage(); } }; }
-    function bindEvents(){ 
-        document.getElementById('addItemBtn').addEventListener('click',addManual); 
-        document.getElementById('clearAllBtn').addEventListener('click',clearAll); 
-        document.getElementById('saveAsImageBtn').addEventListener('click',saveImage); 
-        document.getElementById('downloadPdfBtn').addEventListener('click',downloadPDF); 
-        document.getElementById('printBtn').addEventListener('click',printInvoice); 
-        document.getElementById('moveUpBtn').addEventListener('click',moveUp); 
-        document.getElementById('moveDownBtn').addEventListener('click',moveDown); 
-        document.getElementById('deleteSelectedBtn').addEventListener('click',deleteSelected); 
-        document.getElementById('loadEditBtn').addEventListener('click',loadSelectedToForm); 
-        document.getElementById('saveEditBtn').addEventListener('click',saveEditToSelected); 
-        document.getElementById('parseBtn').addEventListener('click',()=>parseBatch()); 
-        document.getElementById('confirmAddBatchBtn').addEventListener('click',confirmAddBatch); 
-        bindInfoEdits(); 
+    function bindEvents() {
+        document.getElementById('addItemBtn').onclick=addManual;
+        document.getElementById('clearAllBtn').onclick=clearAll;
+        document.getElementById('saveAsImageBtn').onclick=saveImage;
+        document.getElementById('downloadPdfBtn').onclick=downloadPDF;
+        document.getElementById('printBtn').onclick=printInvoice;
+        document.getElementById('moveUpBtn').onclick=moveUp;
+        document.getElementById('moveDownBtn').onclick=moveDown;
+        document.getElementById('deleteSelectedBtn').onclick=deleteSelected;
+        document.getElementById('loadEditBtn').onclick=loadSelectedToForm;
+        document.getElementById('saveEditBtn').onclick=saveEditToSelected;
+        document.getElementById('parseBtn').onclick=()=>parseBatch();
+        document.getElementById('confirmAddBatchBtn').onclick=confirmAddBatch;
+        document.getElementById('editRemarkBtn').onclick=()=>{ let v=prompt("编辑备注",document.getElementById('remarkText').innerText); if(v!==null) document.getElementById('remarkText').innerText=v.trim()||"—"; saveToLocalStorage(); };
+        ['editCompany','editPhone','editContact','editSigner','editCustomer'].forEach(id=>document.getElementById(id).addEventListener('input',syncEditableInfo));
     }
     
-    function init(){ 
-        setInvoiceMeta(); 
-        initRemark(); 
-        bindEvents(); 
+    function initImageControls(){
+        const brandFile=document.getElementById('brandInput'), stampFile=document.getElementById('stampInput');
+        document.getElementById('uploadBrandBtn').onclick=()=>brandFile.click();
+        brandFile.onchange=e=>{ let file=e.target.files[0]; if(file && (file.type==='image/png'||file.type==='image/jpeg')){ let r=new FileReader(); r.onload=ev=>{ let img=document.getElementById('brandImage'); img.src=ev.target.result; img.style.display='inline-block'; img.style.left='20px'; img.style.top='0px'; document.getElementById('brandWidth').value='120'; img.style.width='120px'; saveBrandState(); }; r.readAsDataURL(file); } else alert('仅支持PNG/JPG'); };
+        document.getElementById('removeBrandBtn').onclick=()=>{ document.getElementById('brandImage').src=''; document.getElementById('brandImage').style.display='none'; localStorage.removeItem(BRAND_DATA_KEY); localStorage.removeItem(BRAND_POS_KEY); };
+        document.getElementById('applyBrandSize').onclick=()=>{ let w=parseInt(document.getElementById('brandWidth').value)||120; document.getElementById('brandImage').style.width=w+'px'; saveBrandState(); };
+        document.getElementById('uploadStampBtn').onclick=()=>stampFile.click();
+        stampFile.onchange=e=>{ let file=e.target.files[0]; if(file && (file.type==='image/png'||file.type==='image/jpeg')){ let r=new FileReader(); r.onload=ev=>{ let st=document.getElementById('companyStamp'); st.src=ev.target.result; st.style.display='inline-block'; st.style.right='30px'; st.style.bottom='60px'; st.style.left='auto'; st.style.top='auto'; document.getElementById('stampWidth').value='150'; st.style.width='150px'; saveStampState(); }; r.readAsDataURL(file); } else alert('仅支持PNG/JPG'); };
+        document.getElementById('removeStampBtn').onclick=()=>{ document.getElementById('companyStamp').src=''; document.getElementById('companyStamp').style.display='none'; localStorage.removeItem(STAMP_DATA_KEY); localStorage.removeItem(STAMP_POS_KEY); };
+        document.getElementById('applyStampSize').onclick=()=>{ let w=parseInt(document.getElementById('stampWidth').value)||150; document.getElementById('companyStamp').style.width=w+'px'; saveStampState(); };
+        makeDraggable(document.getElementById('brandImage'), getBrandPos, setBrandPos, saveBrandState);
+        makeDraggable(document.getElementById('companyStamp'), getStampPos, setStampPos, finalStampPos);
+    }
+    
+    function init(){
+        setInvoiceMeta();
         initTabs();
-        
-        const hasBrand = restoreBrand();
-        const hasStamp = restoreStamp();
-        
-        if (!hasBrand) {
-            brandImage.style.left = '20px';
-            brandImage.style.top = '0px';
-            brandImage.style.width = '120px';
-            brandImage.style.height = 'auto';
-            document.getElementById('brandWidth').value = '120';
-        }
-        if (!hasStamp) {
-            companyStamp.style.right = '30px';
-            companyStamp.style.bottom = '60px';
-            companyStamp.style.left = 'auto';
-            companyStamp.style.top = 'auto';
-            setStampSize();
-        }
-        
+        bindEvents();
+        initImageControls();
+        restoreBrand();
+        restoreStamp();
         const hasCache = loadFromLocalStorage();
         if (!hasCache || items.length === 0) {
             items.push({ name: "示例商品", unit: "个", qty: 1, price: 0.00, remark: "" });
             selectedIndex = 0;
             renderTable();
-        } else {
-            syncEditableInfo();
-            renderTable();
-        }
+        } else { syncEditableInfo(); renderTable(); }
     }
     init();
 </script>
