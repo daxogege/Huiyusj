@@ -55,7 +55,7 @@
             cursor: grabbing;
             opacity: 0.7;
         }
-        /* 公司章默认位置：水平居中，底部靠近签章区域（可拖拽移动） */
+        /* 公司章默认位置：右下角，靠近签章区域（可拖拽移动） */
         .company-stamp {
             position: absolute;
             object-fit: contain;
@@ -65,9 +65,10 @@
             background: transparent;
             pointer-events: auto;
             touch-action: none;
-            left: 50%;
-            transform: translateX(-50%);
+            right: 30px;
             bottom: 60px;
+            left: auto;
+            top: auto;
             display: none;
         }
         .sign-line {
@@ -870,7 +871,6 @@
         window.addEventListener('touchcancel', onEnd);
     }
     
-    // 获取品牌图位置（left/top 像素值）
     function getBrandPos() {
         let left = parseFloat(brandImage.style.left);
         let top = parseFloat(brandImage.style.top);
@@ -883,28 +883,26 @@
         brandImage.style.top = top + 'px'; 
     }
     
-    // 获取公司章位置（left/top 像素值），注意 transform 的影响
     function getStampPos() {
         let left = parseFloat(companyStamp.style.left);
         let top = parseFloat(companyStamp.style.top);
-        // 默认值：水平居中（50%），垂直距底部60px（由 bottom 控制）
-        if (isNaN(left)) left = 50;   // 百分比数值
-        if (isNaN(top)) {
-            // 获取当前 bottom 计算出的 top 值
+        if (isNaN(left)) {
+            // 获取当前 right/bottom 计算出的 left/top 值
             const rect = companyStamp.getBoundingClientRect();
             const containerRect = document.getElementById('invoiceContainer').getBoundingClientRect();
+            left = rect.left - containerRect.left;
             top = rect.top - containerRect.top;
-            if (isNaN(top) || top < 0) top = 600;
+            if (isNaN(left) || left < 0) left = 500;
+            if (isNaN(top) || top < 0) top = 620;
         }
         return { left, top };
     }
     function setStampPos(left, top) {
-        // 因为拖拽时我们需要直接设置 left/top（像素），同时要移除 transform 居中效果
+        // 拖拽时切换为 left/top 定位
         companyStamp.style.left = left + 'px';
         companyStamp.style.top = top + 'px';
-        companyStamp.style.transform = 'none';
-        companyStamp.style.bottom = 'auto';
         companyStamp.style.right = 'auto';
+        companyStamp.style.bottom = 'auto';
     }
     
     function setBrandSize() { 
@@ -947,12 +945,11 @@
             reader.onload=ev=>{ 
                 companyStamp.src=ev.target.result; 
                 companyStamp.style.display='inline-block';
-                // 重置为默认居中位置
-                companyStamp.style.left = '50%';
-                companyStamp.style.transform = 'translateX(-50%)';
+                // 重置为默认右下角位置
+                companyStamp.style.right = '30px';
                 companyStamp.style.bottom = '60px';
+                companyStamp.style.left = 'auto';
                 companyStamp.style.top = 'auto';
-                companyStamp.style.right = 'auto';
                 setStampSize(); 
             }; 
             reader.readAsDataURL(file); 
@@ -968,15 +965,14 @@
     makeDraggable(brandImage, getBrandPos, setBrandPos);
     makeDraggable(companyStamp, getStampPos, setStampPos);
     
-    // 初始设置品牌图位置
+    // 初始设置
     setBrandPos(20,0); 
     setBrandSize();
-    // 初始设置公司章位置（居中底部）
-    companyStamp.style.left = '50%';
-    companyStamp.style.transform = 'translateX(-50%)';
+    // 公司章默认右下角
+    companyStamp.style.right = '30px';
     companyStamp.style.bottom = '60px';
+    companyStamp.style.left = 'auto';
     companyStamp.style.top = 'auto';
-    companyStamp.style.right = 'auto';
     setStampSize();
 
     function syncEditableInfo() {
@@ -1060,7 +1056,7 @@
     function loadSelectedToForm(){ if(selectedIndex<0||!items[selectedIndex]){ alert('请先点击序号选中一个商品'); return; } const it=items[selectedIndex]; document.getElementById('prodName').value=it.name; document.getElementById('prodUnit').value=it.unit; document.getElementById('prodQty').value=it.qty; document.getElementById('prodPrice').value=it.price; document.getElementById('prodRemark').value=it.remark||''; }
     function saveEditToSelected(){ if(selectedIndex<0||!items[selectedIndex]){ alert('请先选中要修改的商品'); return; } let name=document.getElementById('prodName').value.trim(); if(!name){ alert("商品名称不能为空"); return; } let unit=document.getElementById('prodUnit').value.trim()||"个"; let qty=parseFloat(document.getElementById('prodQty').value); if(isNaN(qty)||qty<=0){ alert("数量必须大于0"); return; } let price=parseFloat(document.getElementById('prodPrice').value); if(isNaN(price)||price<0){ alert("单价不能为负数"); return; } let remark=document.getElementById('prodRemark').value.trim(); items[selectedIndex]={name,unit,qty,price,remark}; renderTable(); alert(`商品「${name}」已修改`); }
     
-    // 批量解析（简化版保留核心）
+    // 批量解析
     function extractPrice(text){ let match=text.match(/(\d+(?:\.\d{1,2})?)\s*元?\s*$/); if(match) return {price:parseFloat(match[1]), rest:text.substring(0,match.index).trim()}; return null; }
     function extractQuantityUnitFromEnd(text){ let patterns=[/(\d+(?:\.\d+)?)\s*([a-zA-Z\u4e00-\u9fa5]{1,4})$/, /([一二两三四五六七八九十]+)\s*([a-zA-Z\u4e00-\u9fa5]{1,4})$/]; for(let p of patterns){ let match=text.match(p); if(match){ let qtyStr=match[1], unit=match[2]; let qty=1; if(/^\d+(?:\.\d+)?$/.test(qtyStr)) qty=parseFloat(qtyStr); else if(CHINESE_NUM_MAP[qtyStr]) qty=CHINESE_NUM_MAP[qtyStr]; if(qty>0 && STANDARD_UNITS.has(unit)){ let before=text.substring(0,match.index).trim(); if(before.length>0 && before.slice(-1).match(/[xX*]/)) continue; return {qty, unit, rest:before}; } } }
         let anyMatch=text.match(/(?:^|\s)(\d+(?:\.\d+)?)\s+([a-zA-Z\u4e00-\u9fa5]{1,4})(?=\s|$)/); if(anyMatch){ let qty=parseFloat(anyMatch[1]), unit=anyMatch[2]; if(qty>0 && STANDARD_UNITS.has(unit)){ let before=text.substring(0,anyMatch.index).trim(); let after=text.substring(anyMatch.index+anyMatch[0].length).trim(); return {qty,unit,rest:(before+' '+after).trim()}; } } return {qty:1, unit:'个', rest:text}; }
