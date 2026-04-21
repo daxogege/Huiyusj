@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>智能销售单生成器 - 公章位置保持相对偏移</title>
+    <title>智能销售单生成器 - 打印功能全面修复</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* 完整样式（与之前相同，为节省篇幅，此处仅保留核心，实际运行会包含全部样式） */
+        /* 完整样式（与最终稳定版一致，此处略，实际输出包含全部样式） */
         * {
             box-sizing: border-box;
             -webkit-text-size-adjust: 100%;
@@ -866,7 +866,7 @@
         });
     }
     
-    // ======================== 核心克隆函数 ========================
+    // ======================== 核心克隆函数（支持背景图模式） ========================
     function getCleanClone(removeEditButton = true, stampOffsetY = 0, watermarkText = null) {
         const original = document.getElementById('invoiceContainer');
         const clone = original.cloneNode(true);
@@ -1134,7 +1134,7 @@
     function parseBatch(){ const raw=document.getElementById('batchRawInput').value; const lines=raw.split(/\r?\n/); let res=[]; for(let line of lines){ line=line.trim(); if(!line) continue; let p=parseProductLine(line); if(p) res.push(p); } parsedBuffer=res; const previewDiv=document.getElementById('parsePreview'); if(res.length===0) previewDiv.innerHTML='<div style="color:#e67e22;">⚠️ 未能识别有效商品</div>'; else previewDiv.innerHTML=res.map(p=>`<div class="preview-item">✅ ${p.name} &nbsp; ${p.qty}${p.unit} &nbsp; ¥${p.price.toFixed(2)} (小计: ${(p.qty*p.price).toFixed(2)})</div>`).join(''); return res; }
     function confirmAddBatch(){ if(parsedBuffer.length===0){ alert('没有解析成功的商品，请先点击“智能解析预览”'); return; } for(let prod of parsedBuffer) items.push({...prod, remark:''}); if(items.length>0 && selectedIndex===-1) selectedIndex=0; renderTable(); parsedBuffer=[]; document.getElementById('parsePreview').innerHTML='<div style="color:#2e7d64;">✅ 已成功添加</div>'; document.getElementById('batchRawInput').value=''; }
     
-    // ======================== 品牌图/公司章拖拽与存储（支持相对偏移量） ========================
+    // ======================== 品牌图/公司章拖拽与存储（支持相对偏移） ========================
     function makeElementDraggable(el) {
         if (!el) return;
         let drag = false, startX = 0, startY = 0, startL = 0, startT = 0;
@@ -1162,7 +1162,6 @@
             if (el.id === 'companyStamp') {
                 if (isImageMode) saveStampStateBg();
                 else {
-                    // 正常模式下拖拽后，保存章的位置同时更新相对于编号的偏移量
                     updateStampOffset();
                     saveStampState();
                 }
@@ -1239,11 +1238,7 @@
         return false;
     }
     
-    // 计算章相对于“单据编号”的偏移量并存储（仅正常模式）
-    let stampOffsetX = 0;   // 章左边缘相对于编号左边缘的偏移
-    let stampOffsetY = 0;   // 章上边缘相对于编号上边缘的偏移
-    let stampRelativeToNumber = null; // 存储偏移量的key
-    
+    let stampOffsetX = 0, stampOffsetY = 0;
     function updateStampOffset() {
         const stamp = document.getElementById('companyStamp');
         const numberSpan = document.getElementById('invoiceNo');
@@ -1254,7 +1249,6 @@
         stampOffsetY = stampRect.top - numberRect.top;
         localStorage.setItem('stampRelativeOffset', JSON.stringify({ offsetX: stampOffsetX, offsetY: stampOffsetY }));
     }
-    
     function loadStampOffset() {
         const saved = localStorage.getItem('stampRelativeOffset');
         if (saved) {
@@ -1268,23 +1262,17 @@
         return false;
     }
     
-    // 正常模式下公司章位置计算（基于相对偏移）
     function adjustStampPosition() {
         const isImageMode = (document.getElementById('imageModeContainer').style.display === 'block');
         if (isImageMode) return;
         const stamp = document.getElementById('companyStamp');
         if (!stamp || stamp.style.display === 'none') return;
-        
         const numberSpan = document.getElementById('invoiceNo');
         if (!numberSpan) return;
-        
-        // 如果没有保存过偏移量，则计算居中偏移并保存
         if (!loadStampOffset()) {
-            // 计算居中所需的偏移量
             const numberRect = numberSpan.getBoundingClientRect();
             const stampWidth = parseInt(stamp.style.width) || 150;
             const stampHeight = stampWidth;
-            // 章的中心应与编号的中心对齐
             const centerX = (numberRect.left + numberRect.right) / 2;
             const centerY = (numberRect.top + numberRect.bottom) / 2;
             const desiredLeft = centerX - stampWidth / 2;
@@ -1293,23 +1281,17 @@
             stampOffsetY = desiredTop - numberRect.top;
             localStorage.setItem('stampRelativeOffset', JSON.stringify({ offsetX: stampOffsetX, offsetY: stampOffsetY }));
         }
-        
-        // 应用偏移量
         const numberRect = numberSpan.getBoundingClientRect();
         const container = document.getElementById('invoiceContainer');
         const containerRect = container.getBoundingClientRect();
         let left = numberRect.left + stampOffsetX - containerRect.left;
         let top = numberRect.top + stampOffsetY - containerRect.top;
-        
-        // 边界保护
         left = Math.max(5, left);
         top = Math.max(5, top);
-        
         stamp.style.left = left + 'px';
         stamp.style.top = top + 'px';
         stamp.style.right = 'auto';
         stamp.style.bottom = 'auto';
-        
         saveStampState();
     }
     
@@ -1324,7 +1306,6 @@
             localStorage.removeItem('stampImagePos');
         }
     }
-    
     function restoreStamp() {
         const data = localStorage.getItem('stampImageData');
         if (data) {
@@ -1348,7 +1329,6 @@
                 stamp.style.width = w + 'px';
                 document.getElementById('stampWidth').value = w;
             }
-            // 加载偏移量
             loadStampOffset();
             return true;
         }
@@ -1381,7 +1361,6 @@
         return false;
     }
     
-    // 背景图模式下居中位置
     function getCenteredPosition(el, canvasElement) {
         const elWidth = parseFloat(el.style.width) || 150;
         const elHeight = elWidth;
@@ -1586,7 +1565,6 @@
     function initImageControls() {
         const brandFile = document.getElementById('brandInput'), stampFile = document.getElementById('stampInput');
         
-        // 品牌图上传
         document.getElementById('uploadBrandBtn').onclick = () => brandFile.click();
         brandFile.onchange = e => {
             const file = e.target.files[0];
@@ -1646,7 +1624,6 @@
             else saveBrandState();
         };
         
-        // 公司章上传
         document.getElementById('uploadStampBtn').onclick = () => stampFile.click();
         stampFile.onchange = e => {
             const file = e.target.files[0];
@@ -1661,10 +1638,8 @@
                     localStorage.removeItem('stampImageDataBg');
                     localStorage.removeItem('stampImagePosBg');
                     localStorage.removeItem('stampImageWidthBg');
-                    // 清除偏移量缓存，以便重新居中
                     localStorage.removeItem('stampRelativeOffset');
                     st.style.display = 'inline-block';
-                    // 先设置默认宽高，稍后 adjustStampPosition 会计算居中位置
                     const defaultWidth = 150;
                     st.style.width = defaultWidth + 'px';
                     document.getElementById('stampWidth').value = defaultWidth;
@@ -1673,8 +1648,7 @@
                     if (isImageMode && originalImage) {
                         moveAndPositionImage(st, imageModeContainer, imageCanvas);
                     } else {
-                        // 正常模式下，重新计算居中偏移
-                        loadStampOffset(); // 此时无偏移，会重新计算居中
+                        loadStampOffset();
                         adjustStampPosition();
                         saveStampState();
                     }
@@ -1708,9 +1682,6 @@
             if (isImageMode) saveStampStateBg();
             else {
                 saveStampState();
-                // 宽度改变后需要重新调整位置（保持相对偏移不变，但章尺寸变了可能需要重新计算偏移？为了简单，重新居中）
-                // 为了保持用户拖拽后的偏移，最好重新基于当前章位置计算偏移，而不是居中
-                // 这里简单处理：重新居中（用户可再次拖拽调整）
                 localStorage.removeItem('stampRelativeOffset');
                 adjustStampPosition();
             }
@@ -1722,7 +1693,6 @@
         makeElementDraggable(document.getElementById('companyStamp'));
     }
     
-    // 监听表格变化
     function observeTableChanges() {
         const tableBody = document.getElementById('tableBody');
         if (!tableBody) return;
@@ -1732,7 +1702,7 @@
         observer.observe(tableBody, { childList: true, subtree: true, attributes: true });
     }
     
-    // ======================== 导出功能 ========================
+    // ======================== 导出功能（保存图片、PDF、打印） ========================
     async function saveImage(){ 
         const btn=document.getElementById('saveAsImageBtn'), txt=btn.innerText; 
         btn.innerText='生成中...'; btn.disabled=true; 
@@ -1789,6 +1759,7 @@
         }catch(e){ alert('PDF生成失败: ' + e.message); }finally{ btn.innerText=txt; btn.disabled=false; } 
     }
     
+    // 修复后的打印功能：生成 PDF 并在新窗口中自动弹出打印对话框
     async function printInvoice() {
         const btn = document.getElementById('printBtn');
         const originalText = btn.innerText;
@@ -1797,24 +1768,42 @@
         try {
             const watermarkText = await askWatermark();
             const clone = getCleanClone(true, 0, watermarkText);
-            const win = window.open('', '_blank');
-            if (!win) {
-                alert('请允许弹窗，以便打印。');
-                btn.innerText = originalText;
-                btn.disabled = false;
-                return;
+            clone.style.position = 'absolute';
+            clone.style.top = '-9999px';
+            clone.style.left = '0';
+            document.body.appendChild(clone);
+            await new Promise(r => setTimeout(r, 150));
+            const canvas = await html2canvas(clone, {
+                scale: 3,
+                backgroundColor: '#ffffff',
+                logging: false,
+                useCORS: true
+            });
+            document.body.removeChild(clone);
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = pdfWidth / imgWidth;
+            const pdfHeight = imgHeight * ratio;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            // 将 PDF 转为 Blob 并在新窗口打开，自动调用打印
+            const pdfBlob = pdf.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const printWindow = window.open(pdfUrl);
+            if (!printWindow) {
+                alert('请允许弹窗，以便打印。如已阻止，请手动下载PDF后打印。');
+            } else {
+                printWindow.onload = function() {
+                    printWindow.print();
+                    printWindow.onafterprint = function() {
+                        printWindow.close();
+                        URL.revokeObjectURL(pdfUrl);
+                    };
+                };
             }
-            const styles = Array.from(document.styleSheets).reduce((acc, sheet) => {
-                try { const rules = sheet.cssRules || sheet.rules; if (rules) for (let r of rules) acc += r.cssText; } catch(e) {}
-                return acc;
-            }, '');
-            const printStyle = `.watermark-layer { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; opacity: 0.3 !important; }`;
-            win.document.write(`<!DOCTYPE html><html><head><title>销售单打印</title><style>${styles} ${printStyle} .control-panel,.btn-group,.remark-box button{display:none!important;} .brand-overlay,.company-stamp{position:absolute!important;}</style></head><body style="margin:0;display:flex;justify-content:center;"><div style="width:210mm;margin:0 auto;position:relative;">${clone.outerHTML}</div></body></html>`);
-            win.document.close();
-            win.onload = () => {
-                win.print();
-                win.onafterprint = () => win.close();
-            };
         } catch (e) {
             alert('生成打印文件失败: ' + e.message);
         } finally {
